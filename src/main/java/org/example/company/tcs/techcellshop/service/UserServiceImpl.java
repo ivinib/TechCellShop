@@ -5,6 +5,7 @@ import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,10 +14,12 @@ import java.util.List;
 public class UserServiceImpl implements UserService{
 
     private UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
     private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
-    UserServiceImpl(UserRepository userRepository) {
+    UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
 
@@ -26,8 +29,16 @@ public class UserServiceImpl implements UserService{
             if (userRepository.existsByEmailUserIgnoreCase(user.getEmailUser())) {
                 throw new IllegalArgumentException("A user with this email already exists");
             }
+
+            user.setPasswordUser(passwordEncoder.encode(user.getPasswordUser()));
+
             User savedUser = userRepository.save(user);
             log.info("User saved successfully");
+
+            //Applying mask to the sensitive fields
+            savedUser.setPasswordUser(null);
+            savedUser.setEmailUser(maskEmail(savedUser.getEmailUser()));
+
             return ResponseEntity.ok(savedUser);
         } catch (IllegalArgumentException e){
             log.error("A user with email {} already exists", user.getEmailUser());
@@ -102,5 +113,14 @@ public class UserServiceImpl implements UserService{
             log.error("An error occurred while trying to delete the user. Error:" + e.getMessage());
             throw new RuntimeException(e.getMessage());
         }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return email;
+        String[] parts = email.split("@");
+        String local = parts[0];
+        String domain = parts[1];
+        if (local.length() <= 2) return local.charAt(0) + "***@" + domain;
+        return local.charAt(0) + "***" + local.charAt(local.length() - 1) + "@" + domain;
     }
 }
