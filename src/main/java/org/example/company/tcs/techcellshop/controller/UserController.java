@@ -1,5 +1,7 @@
 package org.example.company.tcs.techcellshop.controller;
 
+import jakarta.validation.Valid;
+import org.example.company.tcs.techcellshop.controller.dto.UserEnrollmentRequest;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.service.UserServiceImpl;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +20,15 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<User> saveUser(@RequestBody User user) {
+    public ResponseEntity<User> saveUser(@Valid @RequestBody UserEnrollmentRequest request) {
+        User user = new User();
+        user.setNameUser(request.getNameUser());
+        user.setEmailUser(request.getEmailUser());
+        user.setPasswordUser(request.getPasswordUser());
+        user.setPhoneUser(request.getPhoneUser());
+        user.setAddressUser(request.getAddressUser());
+        user.setRoleUser(request.getRoleUser());
+
         return userService.saveUser(user);
     }
 

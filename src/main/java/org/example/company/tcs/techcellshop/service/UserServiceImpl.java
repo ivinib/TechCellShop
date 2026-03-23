@@ -23,6 +23,10 @@ public class UserServiceImpl implements UserService{
     @Override
     public ResponseEntity<User> saveUser(User user) {
         try{
+            if (userRepository.existsByEmailUserIgnoreCase(user.getEmailUser())) {
+                log.info("A user with email {} already exists", user.getEmailUser());
+                return ResponseEntity.badRequest().build();
+            }
             User savedUser = userRepository.save(user);
             log.info("User saved successfully");
             return ResponseEntity.ok(savedUser);
