@@ -1,6 +1,12 @@
+-- Reset identity sequences to start after seed data
+ALTER TABLE tb_user ALTER COLUMN id_user RESTART WITH 10;
+ALTER TABLE tb_device ALTER COLUMN id_device RESTART WITH 10;
+ALTER TABLE tb_order ALTER COLUMN id_order RESTART WITH 10;
+
+-- Seed data
 MERGE INTO tb_user (id_user, name_user, email_user, password_user, phone_user, address_user, role_user)
     KEY (id_user)
-    VALUES (1, 'Ana Silva', 'ana@techcellshop.com', '123456', '+55 11 90000-0001', 'Sao Paulo - SP', 'CUSTOMER');
+    VALUES (1, 'Ana Silva', 'ana@techcellshop.com', '123456', '+55 11 90000-0001', 'Sao Paulo - SP', 'USER');
 
 MERGE INTO tb_user (id_user, name_user, email_user, password_user, phone_user, address_user, role_user)
     KEY (id_user)

@@ -24,12 +24,14 @@ public class UserServiceImpl implements UserService{
     public ResponseEntity<User> saveUser(User user) {
         try{
             if (userRepository.existsByEmailUserIgnoreCase(user.getEmailUser())) {
-                log.info("A user with email {} already exists", user.getEmailUser());
-                return ResponseEntity.badRequest().build();
+                throw new IllegalArgumentException("A user with this email already exists");
             }
             User savedUser = userRepository.save(user);
             log.info("User saved successfully");
             return ResponseEntity.ok(savedUser);
+        } catch (IllegalArgumentException e){
+            log.error("A user with email {} already exists", user.getEmailUser());
+            throw e;
         } catch (Exception e) {
             log.error("An error occurred while trying to save the user. Error:" + e.getMessage());
             throw new RuntimeException(e.getMessage());
