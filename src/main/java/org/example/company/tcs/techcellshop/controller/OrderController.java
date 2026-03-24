@@ -1,70 +1,59 @@
 package org.example.company.tcs.techcellshop.controller;
 
 import jakarta.validation.Valid;
-import org.example.company.tcs.techcellshop.controller.dto.OrderEnrollmentRequest;
-import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
-import org.example.company.tcs.techcellshop.domain.User;
-import org.example.company.tcs.techcellshop.service.OrderServiceImpl;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
+import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
+import org.example.company.tcs.techcellshop.service.OrderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/order")
 public class OrderController {
 
-    private final OrderServiceImpl orderService;
+    private final OrderService orderService;
+    private final RequestMapper requestMapper;
+    private final ResponseMapper responseMapper;
 
-    OrderController(OrderServiceImpl orderService) {
+    OrderController(OrderService orderService, RequestMapper requestMapper, ResponseMapper responseMapper) {
         this.orderService = orderService;
+        this.requestMapper = requestMapper;
+        this.responseMapper = responseMapper;
     }
 
     @PostMapping
-    public ResponseEntity<Order> saveOrder(@Valid @RequestBody OrderEnrollmentRequest request) {
-
-        User user = new User();
-        user.setIdUser(request.getIdUser());
-
-        Device device = new Device();
-        device.setIdDevice(request.getIdDevice());
-
-        Order order = new Order();
-        order.setUser(user);
-        order.setDevice(device);
-        order.setQuantityOrder(request.getQuantityOrder());
-        order.setTotalPriceOrder(request.getTotalPriceOrder());
-        order.setStatusOrder(request.getStatusOrder());
-        order.setOrderDate(request.getOrderDate());
-        order.setDeliveryDate(request.getDeliveryDate());
-        order.setPaymentMethod(request.getPaymentMethod());
-        order.setPaymentStatus(request.getPaymentStatus());
-
-        return orderService.saveOrder(order);
+    public ResponseEntity<OrderResponse> saveOrder(@Valid @RequestBody OrderEnrollmentRequest request) {
+        Order order = requestMapper.toOrder(request);
+        Order savedOrder = orderService.saveOrder(order);
+        return ResponseEntity.ok(responseMapper.toOrderResponse(savedOrder));
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllOrders() {
-        return orderService.getAllOrders();
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        List<Order> orders = orderService.getAllOrders();
+        return ResponseEntity.ok(responseMapper.toOrderResponseList(orders));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-        return orderService.getOrderById(id);
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
+        Order order = orderService.getOrderById(id);
+        return ResponseEntity.ok(responseMapper.toOrderResponse(order));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Order> updateOrder(@PathVariable Long id, @RequestBody Order order) {
-        return orderService.updateOrder(id, order);
+    public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @RequestBody Order order) {
+        Order updatedOrder = orderService.updateOrder(id, order);
+        return ResponseEntity.ok(responseMapper.toOrderResponse(updatedOrder));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
-        try {
-            orderService.getOrderById(id);
-            orderService.deleteOrder(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        orderService.deleteOrder(id);
+        return ResponseEntity.noContent().build();
     }
 }

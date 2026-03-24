@@ -6,13 +6,9 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 
 public interface OrderService {
-    ResponseEntity<Order> saveOrder(Order order);
-
-    ResponseEntity<Order> getOrderById(Long id);
-
-    ResponseEntity<List<Order>> getAllOrders();
-
-    ResponseEntity<Order> updateOrder(Long id, Order order);
-
-    ResponseEntity<Void> deleteOrder(Long id);
+    Order saveOrder(Order order);
+    Order getOrderById(Long id);
+    List<Order> getAllOrders();
+    Order updateOrder(Long id, Order order);
+    void deleteOrder(Long id);
 }

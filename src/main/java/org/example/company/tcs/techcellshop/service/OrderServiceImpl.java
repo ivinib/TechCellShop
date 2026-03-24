@@ -1,10 +1,10 @@
 package org.example.company.tcs.techcellshop.service;
 
 import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,83 +20,60 @@ public class OrderServiceImpl implements OrderService{
     }
 
     @Override
-    public ResponseEntity<Order> saveOrder(Order order) {
-        try{
-            Order savedOrder = orderRepository.save(order);
-            log.info("Order saved successfully");
-            return ResponseEntity.ok(savedOrder);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to save the order. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Order saveOrder(Order order) {
+        Order savedOrder = orderRepository.save(order);
+        log.info("Order saved successfully");
+        return savedOrder;
     }
 
     @Override
-    public ResponseEntity<Order> getOrderById(Long id) {
-        try {
-            Order order = orderRepository.findById(id).orElse(null);
-            if (order == null) {
-                log.info("No order found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            log.info("Returning order with id {}", id);
-            return ResponseEntity.ok(order);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to get the order by id. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Order getOrderById(Long id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.info("No order found with id {}", id);
+                    return new ResourceNotFoundException("Order not found with id: " + id);
+                });
     }
 
     @Override
-    public ResponseEntity<List<Order>> getAllOrders() {
-        try{
-            List<Order> orders = orderRepository.findAll();
-            if (orders.isEmpty()) {
-                return ResponseEntity.noContent().build();
-            }
-            log.info("Returning all orders. Total of orders found: {}", orders.size());
-            return ResponseEntity.ok(orders);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to get all orders. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public List<Order> getAllOrders() {
+        List<Order> orders = orderRepository.findAll();
+        log.info("Returning all orders. Total found: {}", orders.size());
+        return orders;
     }
 
     @Override
-    public ResponseEntity<Order> updateOrder(Long id, Order order) {
-        try{
-            Order existingOrder = orderRepository.findById(id).orElse(null);
-            if (existingOrder == null) {
-                log.info("No order found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            existingOrder.setUser(order.getUser());
-            existingOrder.setDevice(order.getDevice());
-            existingOrder.setQuantityOrder(order.getQuantityOrder());
-            existingOrder.setTotalPriceOrder(order.getTotalPriceOrder());
-            Order updatedOrder = orderRepository.save(existingOrder);
-            log.info("Order with id {} updated successfully", id);
-            return ResponseEntity.ok(updatedOrder);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to update the order. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Order updateOrder(Long id, Order order) {
+        Order existingOrder = orderRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.info("No order found with id {}", id);
+                    return new ResourceNotFoundException("Order not found with id: " + id);
+                });
+
+        existingOrder.setUser(order.getUser());
+        existingOrder.setDevice(order.getDevice());
+        existingOrder.setQuantityOrder(order.getQuantityOrder());
+        existingOrder.setTotalPriceOrder(order.getTotalPriceOrder());
+        existingOrder.setStatusOrder(order.getStatusOrder());
+        existingOrder.setOrderDate(order.getOrderDate());
+        existingOrder.setDeliveryDate(order.getDeliveryDate());
+        existingOrder.setPaymentMethod(order.getPaymentMethod());
+        existingOrder.setPaymentStatus(order.getPaymentStatus());
+
+        Order updatedOrder = orderRepository.save(existingOrder);
+        log.info("Order with id {} updated successfully", id);
+        return updatedOrder;
     }
 
     @Override
-    public ResponseEntity<Void> deleteOrder(Long id) {
-        try {
-            Order existingOrder = orderRepository.findById(id).orElse(null);
-            if (existingOrder == null) {
-                log.info("No order found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            orderRepository.delete(existingOrder);
-            log.info("Order with id {} deleted successfully", id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            log.error("An error occurred while trying to delete the order. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public void deleteOrder(Long id) {
+        Order existingOrder = orderRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.info("No order found with id {}", id);
+                    return new ResourceNotFoundException("Order not found with id: " + id);
+                });
+
+        orderRepository.delete(existingOrder);
+        log.info("Order with id {} deleted successfully", id);
     }
 }

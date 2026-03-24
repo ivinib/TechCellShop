@@ -1,10 +1,10 @@
 package org.example.company.tcs.techcellshop.service;
 
 import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,82 +20,59 @@ public class DeviceServiceImpl implements DeviceService{
     }
 
     @Override
-    public ResponseEntity<Device> saveDevice(Device device) {
-        try {
-            Device savedDevice = deviceRepository.save(device);
-            log.info("Device saved successfully");
-            return ResponseEntity.ok(savedDevice);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to save the device. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Device saveDevice(Device device) {
+        Device savedDevice = deviceRepository.save(device);
+        log.info("Device with id {} saved successfully", savedDevice.getIdDevice());
+        return savedDevice;
     }
 
     @Override
-    public ResponseEntity<Device> getDeviceById(Long id) {
-        try {
-            Device device = deviceRepository.findById(id).orElse(null);
-            if (device == null) {
-                log.info("No device found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            log.info("Returning device with id {}", id);
-            return ResponseEntity.ok(device);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to get the device by id. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Device getDeviceById(Long id) {
+        return deviceRepository.findById(id).orElseThrow(() -> {
+            log.info("No device found with id {}", id);
+            return new RuntimeException("Device not found with id " + id);
+        });
     }
 
     @Override
-    public ResponseEntity<List<Device>> getAllDevices() {
-        try{
-            List<Device> devices = deviceRepository.findAll();
-            if (devices.isEmpty()) {
-                return ResponseEntity.noContent().build();
-            }
-            log.info("Returning all devices. Total of devices found: {}", devices.size());
-            return ResponseEntity.ok(devices);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to get all devices. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public List<Device> getAllDevices() {
+        List<Device> devices = deviceRepository.findAll();
+        log.info("Retrieved {} devices from the database", devices.size());
+        return devices;
     }
 
     @Override
-    public ResponseEntity<Device> updateDevice(Long id, Device device) {
-        try {
-            Device existingDevice = deviceRepository.findById(id).orElse(null);
-            if (existingDevice == null) {
-                log.info("No device found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            existingDevice.setNameDevice(device.getNameDevice());
-            existingDevice.setDevicePrice(device.getDevicePrice());
-            existingDevice.setDeviceStock(device.getDeviceStock());
-            Device updatedDevice = deviceRepository.save(existingDevice);
-            log.info("Device with id {} updated successfully", id);
-            return ResponseEntity.ok(updatedDevice);
-        } catch (Exception e) {
-            log.error("An error occurred while trying to update the device. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public Device updateDevice(Long id, Device device) {
+        Device existingDevice = deviceRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.info("No device found with id {}", id);
+                    return new ResourceNotFoundException("Device not found with id: " + id);
+                });
+
+        existingDevice.setNameDevice(device.getNameDevice());
+        existingDevice.setDescriptionDevice(device.getDescriptionDevice());
+        existingDevice.setDeviceType(device.getDeviceType());
+        existingDevice.setDeviceStorage(device.getDeviceStorage());
+        existingDevice.setDeviceRam(device.getDeviceRam());
+        existingDevice.setDeviceColor(device.getDeviceColor());
+        existingDevice.setDevicePrice(device.getDevicePrice());
+        existingDevice.setDeviceStock(device.getDeviceStock());
+        existingDevice.setDeviceCondition(device.getDeviceCondition());
+
+        Device updatedDevice = deviceRepository.save(existingDevice);
+        log.info("Device with id {} updated successfully", id);
+        return updatedDevice;
     }
 
     @Override
-    public ResponseEntity<Void> deleteDevice(Long id) {
-        try{
-            Device existingDevice = deviceRepository.findById(id).orElse(null);
-            if (existingDevice == null) {
-                log.info("No device found with id {}", id);
-                return ResponseEntity.notFound().build();
-            }
-            deviceRepository.delete(existingDevice);
-            log.info("Device with id {} deleted successfully", id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            log.error("An error occurred while trying to delete the device. Error:" + e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
+    public void deleteDevice(Long id) {
+        Device existingDevice = deviceRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.info("No device found with id {}", id);
+                    return new ResourceNotFoundException("Device not found with id: " + id);
+                });
+
+        deviceRepository.delete(existingDevice);
+        log.info("Device with id {} deleted successfully", id);
     }
 }

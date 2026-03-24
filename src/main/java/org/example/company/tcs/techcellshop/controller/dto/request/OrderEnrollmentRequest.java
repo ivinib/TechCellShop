@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto;
+package org.example.company.tcs.techcellshop.controller.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
