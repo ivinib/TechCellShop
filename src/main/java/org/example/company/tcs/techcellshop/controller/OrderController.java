@@ -1,6 +1,10 @@
 package org.example.company.tcs.techcellshop.controller;
 
+import jakarta.validation.Valid;
+import org.example.company.tcs.techcellshop.controller.dto.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.service.OrderServiceImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +20,25 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<Order> saveOrder(@RequestBody Order order) {
+    public ResponseEntity<Order> saveOrder(@Valid @RequestBody OrderEnrollmentRequest request) {
+
+        User user = new User();
+        user.setIdUser(request.getIdUser());
+
+        Device device = new Device();
+        device.setIdDevice(request.getIdDevice());
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setDevice(device);
+        order.setQuantityOrder(request.getQuantityOrder());
+        order.setTotalPriceOrder(request.getTotalPriceOrder());
+        order.setStatusOrder(request.getStatusOrder());
+        order.setOrderDate(request.getOrderDate());
+        order.setDeliveryDate(request.getDeliveryDate());
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setPaymentStatus(request.getPaymentStatus());
+
         return orderService.saveOrder(order);
     }
 

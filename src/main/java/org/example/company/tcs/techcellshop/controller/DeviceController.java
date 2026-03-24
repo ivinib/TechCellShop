@@ -1,5 +1,7 @@
 package org.example.company.tcs.techcellshop.controller;
 
+import jakarta.validation.Valid;
+import org.example.company.tcs.techcellshop.controller.dto.DeviceEnrollmentRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.service.DeviceServiceImpl;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +20,18 @@ public class DeviceController {
     }
 
     @PostMapping
-    public ResponseEntity<Device> saveDevice(@RequestBody Device device) {
+    public ResponseEntity<Device> saveDevice(@Valid @RequestBody DeviceEnrollmentRequest request) {
+        Device device = new Device();
+        device.setNameDevice(request.getNameDevice());
+        device.setDescriptionDevice(request.getDescriptionDevice());
+        device.setDeviceType(request.getDeviceType());
+        device.setDeviceStorage(request.getDeviceStorage());
+        device.setDeviceRam(request.getDeviceRam());
+        device.setDeviceColor(request.getDeviceColor());
+        device.setDevicePrice(request.getDevicePrice());
+        device.setDeviceStock(request.getDeviceStock());
+        device.setDeviceCondition(request.getDeviceCondition());
+
         return deviceService.saveDevice(device);
     }
 
