@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.controller.dto.request.UserEnrollmentRequest;
+import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.controller.dto.response.UserResponse;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
@@ -57,6 +58,7 @@ class UserControllerTest {
     private ResponseMapper responseMapper;
 
     private UserEnrollmentRequest validRequest;
+    private UserUpdateRequest validUpdateRequest;
     private User mockUser;
     private UserResponse mockUserResponse;
 
@@ -73,6 +75,13 @@ class UserControllerTest {
         validRequest.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
         validRequest.setRoleUser("USER");
 
+        validUpdateRequest = new UserUpdateRequest();
+        validUpdateRequest.setNameUser("Ana Silva");
+        validUpdateRequest.setEmailUser("ana@techcellshop.com");
+        validUpdateRequest.setPhoneUser("+55 11 90000-0001");
+        validUpdateRequest.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
+        validUpdateRequest.setRoleUser("USER");
+
         mockUser = new User();
         mockUser.setIdUser(1L);
         mockUser.setNameUser("Ana Silva");
@@ -88,7 +97,7 @@ class UserControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /user")
+    @DisplayName("POST /api/v1/users")
     class SaveUser {
 
         @Test
@@ -98,7 +107,7 @@ class UserControllerTest {
             when(userService.saveUser(any())).thenReturn(mockUser);
             when(responseMapper.toUserResponse(any())).thenReturn(mockUserResponse);
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isOk())
@@ -113,7 +122,7 @@ class UserControllerTest {
         void shouldReturn400_whenNameIsTooShort() throws Exception {
             validRequest.setNameUser("Al");
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -125,7 +134,7 @@ class UserControllerTest {
         void shouldReturn400_whenEmailIsInvalid() throws Exception {
             validRequest.setEmailUser("not-an-email");
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -137,7 +146,7 @@ class UserControllerTest {
         void shouldReturn400_whenPasswordHasNoLetters() throws Exception {
             validRequest.setPasswordUser("123456");
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -149,7 +158,7 @@ class UserControllerTest {
         void shouldReturn400_whenRoleIsInvalid() throws Exception {
             validRequest.setRoleUser("CUSTOMER");
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -163,7 +172,7 @@ class UserControllerTest {
             when(userService.saveUser(any()))
                     .thenThrow(new IllegalArgumentException("A user with this email already exists"));
 
-            mockMvc.perform(post("/user")
+            mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isConflict())
@@ -172,7 +181,7 @@ class UserControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /user")
+    @DisplayName("GET /api/v1/users")
     class GetAllUsers {
 
         @Test
@@ -182,7 +191,7 @@ class UserControllerTest {
             when(userService.getAllUsers()).thenReturn(List.of(mockUser));
             when(responseMapper.toUserResponseList(any())).thenReturn(List.of(mockUserResponse));
 
-            mockMvc.perform(get("/user"))
+            mockMvc.perform(get("/api/v1/users"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(1))
                     .andExpect(jsonPath("$[0].nameUser").value("Ana Silva"));
@@ -195,21 +204,22 @@ class UserControllerTest {
             when(userService.getAllUsers()).thenReturn(List.of());
             when(responseMapper.toUserResponseList(any())).thenReturn(List.of());
 
-            mockMvc.perform(get("/user"))
+            mockMvc.perform(get("/api/v1/users"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(0));
+
         }
 
         @Test
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/user"))
+            mockMvc.perform(get("/api/v1/users"))
                     .andExpect(status().isUnauthorized());
         }
     }
 
     @Nested
-    @DisplayName("GET /user/{id}")
+    @DisplayName("GET /api/v1/users/{id}")
     class GetUserById {
 
         @Test
@@ -219,7 +229,7 @@ class UserControllerTest {
             when(userService.getUserById(1L)).thenReturn(mockUser);
             when(responseMapper.toUserResponse(any())).thenReturn(mockUserResponse);
 
-            mockMvc.perform(get("/user/1"))
+            mockMvc.perform(get("/api/v1/users/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.idUser").value(1L))
                     .andExpect(jsonPath("$.nameUser").value("Ana Silva"));
@@ -232,14 +242,14 @@ class UserControllerTest {
             when(userService.getUserById(99L))
                     .thenThrow(new ResourceNotFoundException("User not found with id: 99"));
 
-            mockMvc.perform(get("/user/99"))
+            mockMvc.perform(get("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("User not found with id: 99"));
         }
     }
 
     @Nested
-    @DisplayName("PUT /user/{id}")
+    @DisplayName("PUT /api/v1/users/{id}")
     class UpdateUser {
 
         @Test
@@ -253,9 +263,9 @@ class UserControllerTest {
             when(userService.updateUser(eq(1L), any())).thenReturn(mockUser);
             when(responseMapper.toUserResponse(any())).thenReturn(updatedResponse);
 
-            mockMvc.perform(put("/user/1")
+            mockMvc.perform(put("/api/v1/users/1")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(mockUser)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.nameUser").value("Ana Silva Updated"));
         }
@@ -267,16 +277,16 @@ class UserControllerTest {
             when(userService.updateUser(eq(99L), any()))
                     .thenThrow(new ResourceNotFoundException("User not found with id: 99"));
 
-            mockMvc.perform(put("/user/99")
+            mockMvc.perform(put("/api/v1/users/99")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(mockUser)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("User not found with id: 99"));
         }
     }
 
     @Nested
-    @DisplayName("DELETE /user/{id}")
+    @DisplayName("DELETE /api/v1/users/{id}")
     class DeleteUser {
 
         @Test
@@ -285,7 +295,7 @@ class UserControllerTest {
         void shouldReturn204_whenUserIsDeleted() throws Exception {
             doNothing().when(userService).deleteUser(1L);
 
-            mockMvc.perform(delete("/user/1"))
+            mockMvc.perform(delete("/api/v1/users/1"))
                     .andExpect(status().isNoContent());
         }
 
@@ -296,7 +306,7 @@ class UserControllerTest {
             doThrow(new ResourceNotFoundException("User not found with id: 99"))
                     .when(userService).deleteUser(99L);
 
-            mockMvc.perform(delete("/user/99"))
+            mockMvc.perform(delete("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("User not found with id: 99"));
         }

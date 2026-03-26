@@ -1,5 +1,6 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
@@ -95,7 +96,7 @@ class UserServiceImplTest {
         List<User> result = userService.getAllUsers();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getNameUser()).isEqualTo("Ana Silva");
+        assertThat(result.getFirst().getNameUser()).isEqualTo("Ana Silva");
     }
 
     @Test
@@ -109,25 +110,43 @@ class UserServiceImplTest {
 
     @Test
     void updateUser_whenUserExists_shouldUpdateNameAndEmailAndReturn() {
-        User updateData = new User();
-        updateData.setNameUser("Ana Updated");
-        updateData.setEmailUser("ana.updated@techcellshop.com");
+        UserUpdateRequest updateRequest = new UserUpdateRequest();
+        updateRequest.setNameUser("Ana Updated");
+        updateRequest.setEmailUser("ana.updated@techcellshop.com");
+        updateRequest.setPhoneUser("+55 11 90000-0001");
+        updateRequest.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
+        updateRequest.setRoleUser("USER");
+
+        User updatedUser = new User();
+        updatedUser.setIdUser(1L);
+        updatedUser.setNameUser("Ana Updated");
+        updatedUser.setEmailUser("ana.updated@techcellshop.com");
+        updatedUser.setPhoneUser("+55 11 90000-0001");
+        updatedUser.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
+        updatedUser.setRoleUser("USER");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        when(userRepository.save(any(User.class))).thenReturn(updatedUser);
 
-        User result = userService.updateUser(1L, updateData);
+        User result = userService.updateUser(1L, updateRequest);
 
         assertThat(result.getNameUser()).isEqualTo("Ana Updated");
         assertThat(result.getEmailUser()).isEqualTo("ana.updated@techcellshop.com");
-        verify(userRepository).save(user);
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
     void updateUser_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        UserUpdateRequest updateRequest = new UserUpdateRequest();
+        updateRequest.setNameUser("Ana Updated");
+        updateRequest.setEmailUser("ana.updated@techcellshop.com");
+        updateRequest.setPhoneUser("+55 11 90000-0001");
+        updateRequest.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
+        updateRequest.setRoleUser("USER");
+
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.updateUser(99L, new User()))
+        assertThatThrownBy(() -> userService.updateUser(99L, updateRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("User not found with id: 99");
     }

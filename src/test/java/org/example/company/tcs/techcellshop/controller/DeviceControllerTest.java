@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.controller.dto.request.DeviceEnrollmentRequest;
+import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.controller.dto.response.DeviceResponse;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
@@ -55,6 +56,7 @@ class DeviceControllerTest {
     private ResponseMapper responseMapper;
 
     private DeviceEnrollmentRequest validRequest;
+    private DeviceUpdateRequest validUpdateRequest;
     private Device mockDevice;
     private DeviceResponse mockDeviceResponse;
 
@@ -73,6 +75,17 @@ class DeviceControllerTest {
         validRequest.setDevicePrice(3999.90);
         validRequest.setDeviceStock(10);
         validRequest.setDeviceCondition("NEW");
+
+        validUpdateRequest = new DeviceUpdateRequest();
+        validUpdateRequest.setNameDevice("Galaxy S24");
+        validUpdateRequest.setDescriptionDevice("Samsung smartphone 256GB");
+        validUpdateRequest.setDeviceType("SMARTPHONE");
+        validUpdateRequest.setDeviceStorage("256GB");
+        validUpdateRequest.setDeviceRam("8GB");
+        validUpdateRequest.setDeviceColor("Black");
+        validUpdateRequest.setDevicePrice(3999.90);
+        validUpdateRequest.setDeviceStock(10);
+        validUpdateRequest.setDeviceCondition("NEW");
 
         mockDevice = new Device();
         mockDevice.setIdDevice(1L);
@@ -104,7 +117,7 @@ class DeviceControllerTest {
             when(deviceService.saveDevice(any())).thenReturn(mockDevice);
             when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
 
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isOk())
@@ -120,7 +133,7 @@ class DeviceControllerTest {
         void shouldReturn400_whenDeviceTypeIsInvalid() throws Exception {
             validRequest.setDeviceType("PHONE");
 
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -133,7 +146,7 @@ class DeviceControllerTest {
         void shouldReturn400_whenStorageFormatIsInvalid() throws Exception {
             validRequest.setDeviceStorage("256");
 
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -146,7 +159,7 @@ class DeviceControllerTest {
         void shouldReturn400_whenPriceIsNegative() throws Exception {
             validRequest.setDevicePrice(-1.0);
 
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -159,7 +172,7 @@ class DeviceControllerTest {
         void shouldReturn400_whenConditionIsInvalid() throws Exception {
             validRequest.setDeviceCondition("OLD");
 
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
@@ -169,7 +182,7 @@ class DeviceControllerTest {
         @Test
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
-            mockMvc.perform(post("/device")
+            mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isUnauthorized());
@@ -187,7 +200,7 @@ class DeviceControllerTest {
             when(deviceService.getAllDevices()).thenReturn(List.of(mockDevice));
             when(responseMapper.toDeviceResponseList(any())).thenReturn(List.of(mockDeviceResponse));
 
-            mockMvc.perform(get("/device"))
+            mockMvc.perform(get("/api/v1/devices"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(1))
                     .andExpect(jsonPath("$[0].nameDevice").value("Galaxy S24"));
@@ -200,7 +213,7 @@ class DeviceControllerTest {
             when(deviceService.getAllDevices()).thenReturn(List.of());
             when(responseMapper.toDeviceResponseList(any())).thenReturn(List.of());
 
-            mockMvc.perform(get("/device"))
+            mockMvc.perform(get("/api/v1/devices"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(0));
         }
@@ -208,7 +221,7 @@ class DeviceControllerTest {
         @Test
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/device"))
+            mockMvc.perform(get("/api/v1/devices"))
                     .andExpect(status().isUnauthorized());
         }
     }
@@ -224,7 +237,7 @@ class DeviceControllerTest {
             when(deviceService.getDeviceById(1L)).thenReturn(mockDevice);
             when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
 
-            mockMvc.perform(get("/device/1"))
+            mockMvc.perform(get("/api/v1/devices/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.idDevice").value(1L))
                     .andExpect(jsonPath("$.nameDevice").value("Galaxy S24"));
@@ -237,7 +250,7 @@ class DeviceControllerTest {
             when(deviceService.getDeviceById(99L))
                     .thenThrow(new ResourceNotFoundException("Device not found with id: 99"));
 
-            mockMvc.perform(get("/device/99"))
+            mockMvc.perform(get("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
         }
@@ -258,9 +271,9 @@ class DeviceControllerTest {
             when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
             when(responseMapper.toDeviceResponse(any())).thenReturn(updatedResponse);
 
-            mockMvc.perform(put("/device/1")
+            mockMvc.perform(put("/api/v1/devices/1")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(mockDevice)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.nameDevice").value("Galaxy S24 Ultra"))
                     .andExpect(jsonPath("$.devicePrice").value(4999.90));
@@ -273,9 +286,9 @@ class DeviceControllerTest {
             when(deviceService.updateDevice(eq(99L), any()))
                     .thenThrow(new ResourceNotFoundException("Device not found with id: 99"));
 
-            mockMvc.perform(put("/device/99")
+            mockMvc.perform(put("/api/v1/devices/99")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(mockDevice)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
         }
@@ -291,7 +304,7 @@ class DeviceControllerTest {
         void shouldReturn204_whenDeviceIsDeleted() throws Exception {
             doNothing().when(deviceService).deleteDevice(1L);
 
-            mockMvc.perform(delete("/device/1"))
+            mockMvc.perform(delete("/api/v1/devices/1"))
                     .andExpect(status().isNoContent());
         }
 
@@ -302,7 +315,7 @@ class DeviceControllerTest {
             doThrow(new ResourceNotFoundException("Device not found with id: 99"))
                     .when(deviceService).deleteDevice(99L);
 
-            mockMvc.perform(delete("/device/99"))
+            mockMvc.perform(delete("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
         }

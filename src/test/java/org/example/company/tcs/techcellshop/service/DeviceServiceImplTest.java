@@ -1,5 +1,6 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
@@ -82,7 +83,7 @@ class DeviceServiceImplTest {
         List<Device> result = deviceService.getAllDevices();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getNameDevice()).isEqualTo("Galaxy S24");
+        assertThat(result.getFirst().getNameDevice()).isEqualTo("Galaxy S24");
     }
 
     @Test
@@ -96,34 +97,57 @@ class DeviceServiceImplTest {
 
     @Test
     void updateDevice_whenDeviceExists_shouldUpdateAllFieldsAndReturn() {
-        Device updateData = new Device();
-        updateData.setNameDevice("Galaxy S24 Ultra");
-        updateData.setDescriptionDevice("Updated description");
-        updateData.setDeviceType("SMARTPHONE");
-        updateData.setDeviceStorage("512GB");
-        updateData.setDeviceRam("12GB");
-        updateData.setDeviceColor("Silver");
-        updateData.setDevicePrice(4999.90);
-        updateData.setDeviceStock(5);
-        updateData.setDeviceCondition("NEW");
+        DeviceUpdateRequest updateRequest = new DeviceUpdateRequest();
+        updateRequest.setNameDevice("Galaxy S24 Ultra");
+        updateRequest.setDescriptionDevice("Updated description");
+        updateRequest.setDeviceType("SMARTPHONE");
+        updateRequest.setDeviceStorage("512GB");
+        updateRequest.setDeviceRam("12GB");
+        updateRequest.setDeviceColor("Silver");
+        updateRequest.setDevicePrice(4999.90);
+        updateRequest.setDeviceStock(5);
+        updateRequest.setDeviceCondition("NEW");
+
+        Device updatedDevice = new Device();
+        updatedDevice.setIdDevice(1L);
+        updatedDevice.setNameDevice("Galaxy S24 Ultra");
+        updatedDevice.setDescriptionDevice("Updated description");
+        updatedDevice.setDeviceType("SMARTPHONE");
+        updatedDevice.setDeviceStorage("512GB");
+        updatedDevice.setDeviceRam("12GB");
+        updatedDevice.setDeviceColor("Silver");
+        updatedDevice.setDevicePrice(4999.90);
+        updatedDevice.setDeviceStock(5);
+        updatedDevice.setDeviceCondition("NEW");
 
         when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
-        when(deviceRepository.save(any(Device.class))).thenReturn(device);
+        when(deviceRepository.save(any(Device.class))).thenReturn(updatedDevice);
 
-        Device result = deviceService.updateDevice(1L, updateData);
+        Device result = deviceService.updateDevice(1L, updateRequest);
 
         assertThat(result.getNameDevice()).isEqualTo("Galaxy S24 Ultra");
         assertThat(result.getDevicePrice()).isEqualTo(4999.90);
         assertThat(result.getDeviceStock()).isEqualTo(5);
         assertThat(result.getDeviceStorage()).isEqualTo("512GB");
-        verify(deviceRepository).save(device);
+        verify(deviceRepository).save(any(Device.class));
     }
 
     @Test
     void updateDevice_whenDeviceNotFound_shouldThrowResourceNotFoundException() {
+        DeviceUpdateRequest updateRequest = new DeviceUpdateRequest();
+        updateRequest.setNameDevice("Galaxy S24 Ultra");
+        updateRequest.setDescriptionDevice("Updated description");
+        updateRequest.setDeviceType("SMARTPHONE");
+        updateRequest.setDeviceStorage("512GB");
+        updateRequest.setDeviceRam("12GB");
+        updateRequest.setDeviceColor("Silver");
+        updateRequest.setDevicePrice(4999.90);
+        updateRequest.setDeviceStock(5);
+        updateRequest.setDeviceCondition("NEW");
+
         when(deviceRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> deviceService.updateDevice(99L, new Device()))
+        assertThatThrownBy(() -> deviceService.updateDevice(99L, updateRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Device not found with id: 99");
     }

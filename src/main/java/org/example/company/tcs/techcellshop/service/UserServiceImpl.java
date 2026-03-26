@@ -1,7 +1,9 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,13 +15,15 @@ import java.util.List;
 @Service
 public class UserServiceImpl implements UserService{
 
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+    private final RequestMapper requestMapper;
 
-    UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, RequestMapper requestMapper) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.requestMapper = requestMapper;
     }
 
     @Override
@@ -56,15 +60,14 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public User updateUser(Long id, User user) {
+    public User updateUser(Long id, UserUpdateRequest request) {
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> {
                     log.info("No user found with id {}", id);
                     return new ResourceNotFoundException("User not found with id: " + id);
                 });
 
-        existingUser.setNameUser(user.getNameUser());
-        existingUser.setEmailUser(user.getEmailUser());
+        requestMapper.updateUser(existingUser, request);
         User updatedUser = userRepository.save(existingUser);
         log.info("User with id {} updated successfully", id);
         return updatedUser;

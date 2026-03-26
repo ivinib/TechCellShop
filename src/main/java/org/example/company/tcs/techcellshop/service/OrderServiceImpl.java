@@ -1,7 +1,9 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,11 +14,13 @@ import java.util.List;
 @Service
 public class OrderServiceImpl implements OrderService{
 
-    private OrderRepository orderRepository;
+    private final OrderRepository orderRepository;
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+    private final RequestMapper requestMapper;
 
-    OrderServiceImpl(OrderRepository orderRepository) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper) {
         this.orderRepository = orderRepository;
+        this.requestMapper = requestMapper;
     }
 
     @Override
@@ -43,23 +47,14 @@ public class OrderServiceImpl implements OrderService{
     }
 
     @Override
-    public Order updateOrder(Long id, Order order) {
+    public Order updateOrder(Long id, OrderUpdateRequest request) {
         Order existingOrder = orderRepository.findById(id)
                 .orElseThrow(() -> {
                     log.info("No order found with id {}", id);
                     return new ResourceNotFoundException("Order not found with id: " + id);
                 });
 
-        existingOrder.setUser(order.getUser());
-        existingOrder.setDevice(order.getDevice());
-        existingOrder.setQuantityOrder(order.getQuantityOrder());
-        existingOrder.setTotalPriceOrder(order.getTotalPriceOrder());
-        existingOrder.setStatusOrder(order.getStatusOrder());
-        existingOrder.setOrderDate(order.getOrderDate());
-        existingOrder.setDeliveryDate(order.getDeliveryDate());
-        existingOrder.setPaymentMethod(order.getPaymentMethod());
-        existingOrder.setPaymentStatus(order.getPaymentStatus());
-
+        requestMapper.updateOrder(existingOrder, request);
         Order updatedOrder = orderRepository.save(existingOrder);
         log.info("Order with id {} updated successfully", id);
         return updatedOrder;

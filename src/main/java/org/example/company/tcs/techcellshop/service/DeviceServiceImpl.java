@@ -1,7 +1,9 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,11 +14,13 @@ import java.util.List;
 @Service
 public class DeviceServiceImpl implements DeviceService{
 
-    private DeviceRepository deviceRepository;
+    private final DeviceRepository deviceRepository;
     private static final Logger log = LoggerFactory.getLogger(DeviceServiceImpl.class);
+    private final RequestMapper requestMapper;
 
-    DeviceServiceImpl(DeviceRepository deviceRepository) {
+    DeviceServiceImpl(DeviceRepository deviceRepository, RequestMapper requestMapper) {
         this.deviceRepository = deviceRepository;
+        this.requestMapper = requestMapper;
     }
 
     @Override
@@ -42,23 +46,14 @@ public class DeviceServiceImpl implements DeviceService{
     }
 
     @Override
-    public Device updateDevice(Long id, Device device) {
+    public Device updateDevice(Long id, DeviceUpdateRequest request) {
         Device existingDevice = deviceRepository.findById(id)
                 .orElseThrow(() -> {
                     log.info("No device found with id {}", id);
                     return new ResourceNotFoundException("Device not found with id: " + id);
                 });
 
-        existingDevice.setNameDevice(device.getNameDevice());
-        existingDevice.setDescriptionDevice(device.getDescriptionDevice());
-        existingDevice.setDeviceType(device.getDeviceType());
-        existingDevice.setDeviceStorage(device.getDeviceStorage());
-        existingDevice.setDeviceRam(device.getDeviceRam());
-        existingDevice.setDeviceColor(device.getDeviceColor());
-        existingDevice.setDevicePrice(device.getDevicePrice());
-        existingDevice.setDeviceStock(device.getDeviceStock());
-        existingDevice.setDeviceCondition(device.getDeviceCondition());
-
+        requestMapper.updateDevice(existingDevice, request);
         Device updatedDevice = deviceRepository.save(existingDevice);
         log.info("Device with id {} updated successfully", id);
         return updatedDevice;

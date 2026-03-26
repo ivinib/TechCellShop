@@ -1,9 +1,11 @@
 package org.example.company.tcs.techcellshop.service;
 
+import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,8 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +27,9 @@ class OrderServiceImplTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private RequestMapper requestMapper;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -93,7 +99,7 @@ class OrderServiceImplTest {
         List<Order> result = orderService.getAllOrders();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getStatusOrder()).isEqualTo("CREATED");
+        assertThat(result.getFirst().getStatusOrder()).isEqualTo("CREATED");
     }
 
     @Test
@@ -106,38 +112,54 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void updateOrder_whenOrderExists_shouldUpdateAllFieldsAndReturn() {
-        Order updateData = new Order();
-        updateData.setUser(order.getUser());
-        updateData.setDevice(order.getDevice());
-        updateData.setQuantityOrder(3);
-        updateData.setTotalPriceOrder(11999.70);
-        updateData.setStatusOrder("PROCESSING");
-        updateData.setOrderDate("2026-03-24");
-        updateData.setDeliveryDate("2026-04-07");
-        updateData.setPaymentMethod("PIX");
-        updateData.setPaymentStatus("PAID");
+    void updateOrder_whenOrderExists_shouldApplyUpdateRequestAndReturn() {
+        OrderUpdateRequest updateRequest = new OrderUpdateRequest();
+        updateRequest.setQuantityOrder(3);
+        updateRequest.setStatusOrder("PROCESSING");
+        updateRequest.setDeliveryDate("2026-04-07");
+        updateRequest.setPaymentStatus("PAID");
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenReturn(order);
 
-        Order result = orderService.updateOrder(1L, updateData);
+        doAnswer(invocation -> {
+            Order target = invocation.getArgument(0);
+            OrderUpdateRequest req = invocation.getArgument(1);
+            target.setQuantityOrder(req.getQuantityOrder());
+            target.setStatusOrder(req.getStatusOrder());
+            target.setDeliveryDate(req.getDeliveryDate());
+            target.setPaymentStatus(req.getPaymentStatus());
+            return null;
+        }).when(requestMapper).updateOrder(any(Order.class), any(OrderUpdateRequest.class));
+
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order result = orderService.updateOrder(1L, updateRequest);
 
         assertThat(result.getQuantityOrder()).isEqualTo(3);
-        assertThat(result.getTotalPriceOrder()).isEqualTo(11999.70);
         assertThat(result.getStatusOrder()).isEqualTo("PROCESSING");
-        assertThat(result.getPaymentMethod()).isEqualTo("PIX");
+        assertThat(result.getDeliveryDate()).isEqualTo("2026-04-07");
         assertThat(result.getPaymentStatus()).isEqualTo("PAID");
+
+        verify(requestMapper).updateOrder(order, updateRequest);
         verify(orderRepository).save(order);
     }
 
     @Test
     void updateOrder_whenOrderNotFound_shouldThrowResourceNotFoundException() {
+        OrderUpdateRequest updateRequest = new OrderUpdateRequest();
+        updateRequest.setQuantityOrder(2);
+        updateRequest.setStatusOrder("PROCESSING");
+        updateRequest.setDeliveryDate("2026-04-01");
+        updateRequest.setPaymentStatus("AUTHORIZED");
+
         when(orderRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> orderService.updateOrder(99L, new Order()))
+        assertThatThrownBy(() -> orderService.updateOrder(99L, updateRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Order not found with id: 99");
+
+        verify(requestMapper, never()).updateOrder(any(Order.class), any(OrderUpdateRequest.class));
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
