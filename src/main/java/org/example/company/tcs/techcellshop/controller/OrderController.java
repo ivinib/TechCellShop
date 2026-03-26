@@ -31,8 +31,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<OrderResponse> saveOrder(@Valid @RequestBody OrderEnrollmentRequest request, UriComponentsBuilder uriBuilder) {
-        Order order = requestMapper.toOrder(request);
-        Order savedOrder = orderService.saveOrder(order);
+        Order savedOrder = orderService.placeOrder(request);
         OrderResponse response = responseMapper.toOrderResponse(savedOrder);
 
         URI location = uriBuilder

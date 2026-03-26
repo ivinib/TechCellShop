@@ -65,23 +65,6 @@ public class RequestMapper {
         );
     }
 
-    public Order toOrder(OrderEnrollmentRequest request) {
-        Order order = new Order();
-
-        User user = new User();
-        user.setIdUser(request.getIdUser());
-
-        Device device = new Device();
-        device.setIdDevice(request.getIdDevice());
-
-        order.setUser(user);
-        order.setDevice(device);
-        order.setQuantityOrder(request.getQuantityOrder());
-        order.setPaymentMethod(request.getPaymentMethod());
-
-        return order;
-    }
-
     public void updateOrder(Order order, OrderUpdateRequest request) {
         order.setQuantityOrder(request.getQuantityOrder());
         order.setStatusOrder(request.getStatusOrder());
