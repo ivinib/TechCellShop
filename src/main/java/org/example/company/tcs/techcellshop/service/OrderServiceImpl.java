@@ -1,6 +1,7 @@
 package org.example.company.tcs.techcellshop.service;
 
 import jakarta.transaction.Transactional;
+import org.example.company.tcs.techcellshop.messaging.OrderCreatedDomainEvent;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
@@ -14,6 +15,7 @@ import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -27,14 +29,16 @@ public class OrderServiceImpl implements OrderService{
     private final RequestMapper requestMapper;
     private final UserRepository userRepository;
     private final DeviceRepository deviceRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
         this.deviceRepository = deviceRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -124,6 +128,8 @@ public class OrderServiceImpl implements OrderService{
         double total = device.getDevicePrice() * quantity;
         order.setTotalPriceOrder(total);
 
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        applicationEventPublisher.publishEvent(new OrderCreatedDomainEvent(saved));
+        return saved;
     }
 }
