@@ -21,7 +21,7 @@ public class OrderCreatedListener {
     }
 
     @Transactional
-    @RabbitListener(queues = "${app.messaging.order-created.queue}ueue")
+    @RabbitListener(queues = "${app.messaging.order-created.queue}")
     public void handle(OrderCreatedEvent event) {
         if (processedEventRepository.existsByEventId(event.eventId())) {
             log.info("Duplicate event received with eventId={}, ignoring", event.eventId());

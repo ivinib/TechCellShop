@@ -70,5 +70,5 @@ src/main/java/org/example/company/tcs/techcellshop
 src/main/resources
 ├── application.properties
 ├── application-dev.properties
-└── sql/data.sql
+└── sql/data-postgres.sql
 
