@@ -1,5 +1,12 @@
 package org.example.company.tcs.techcellshop.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.company.tcs.techcellshop.controller.dto.request.DeviceEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
@@ -15,6 +22,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.List;
 
+import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
+
+@Tag(name = "Device Management", description = "Endpoints for managing devices")
 @RestController
 @RequestMapping("/api/v1/devices")
 public class DeviceController {
@@ -29,8 +39,44 @@ public class DeviceController {
         this.responseMapper = responseMapper;
     }
 
+    @Operation(
+            summary = "Enroll a device",
+            description = "Saves a new device to the database, including it in the catalog",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Device enrolled"),
+            @ApiResponse(responseCode = "400", description = "Validation error"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
     @PostMapping
-    public ResponseEntity<DeviceResponse> saveDevice(@Valid @RequestBody DeviceEnrollmentRequest request, UriComponentsBuilder uriBuilder) {
+    public ResponseEntity<DeviceResponse> saveDevice(
+            @Valid
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Payload to enroll a new device",
+                    required = true,
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Device payload example",
+                                    value = """
+                                            {
+                                              "nameDevice": "Galaxy S24",
+                                              "descriptionDevice": "Samsung smartphone 256GB",
+                                              "typeDevice": "SMARTPHONE",
+                                              "storageDevice": "256GB",
+                                              "ramDevice": "8GB",
+                                              "colorDevice": "Black",
+                                              "priceDevice": 3999.90,
+                                              "stockDevice": 10,
+                                              "conditionDevice": "NEW"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody DeviceEnrollmentRequest request,
+            UriComponentsBuilder uriBuilder
+    ) {
         Device device = requestMapper.toDevice(request);
         Device savedDevice = deviceService.saveDevice(device);
         DeviceResponse response = responseMapper.toDeviceResponse(savedDevice);
@@ -43,30 +89,55 @@ public class DeviceController {
         return ResponseEntity.created(location).body(response);
     }
 
+    @Operation(
+            summary = "List all devices enrolled",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponse(responseCode = "200", description = "Devices returned")
     @GetMapping
     public ResponseEntity<List<DeviceResponse>> getAllDevices() {
         List<Device> devices = deviceService.getAllDevices();
         return ResponseEntity.ok(responseMapper.toDeviceResponseList(devices));
     }
 
+    @Operation(
+            summary = "Search for a specific device by its id",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Device found"),
+            @ApiResponse(responseCode = "404", description = "Device not found")
+    })
     @GetMapping("/{id}")
     public ResponseEntity<DeviceResponse> getDeviceById(@PathVariable Long id) {
         Device device = deviceService.getDeviceById(id);
         return ResponseEntity.ok(responseMapper.toDeviceResponse(device));
     }
 
+    @Operation(
+            summary = "Update a device",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
     @PutMapping("/{id}")
     public ResponseEntity<DeviceResponse> updateDevice(@PathVariable Long id, @Valid @RequestBody DeviceUpdateRequest request) {
         Device updatedDevice = deviceService.updateDevice(id, request);
         return ResponseEntity.ok(responseMapper.toDeviceResponse(updatedDevice));
     }
 
+    @Operation(
+            summary = "Update a device partially",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
     @PatchMapping("/{id}")
     public ResponseEntity<DeviceResponse> partiallyUpdateDevice(@PathVariable Long id, @Valid @RequestBody DeviceUpdateRequest request) {
         Device updatedDevice = deviceService.updateDevice(id, request);
         return ResponseEntity.ok(responseMapper.toDeviceResponse(updatedDevice));
     }
 
+    @Operation(
+            summary = "Delete a specific device using its id",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDevice(@PathVariable Long id) {
         deviceService.deleteDevice(id);
