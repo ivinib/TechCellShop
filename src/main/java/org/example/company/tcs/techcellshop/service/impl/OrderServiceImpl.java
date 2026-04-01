@@ -1,6 +1,9 @@
-package org.example.company.tcs.techcellshop.service;
+package org.example.company.tcs.techcellshop.service.impl;
 
 import jakarta.transaction.Transactional;
+import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
+import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.messaging.OrderCreatedDomainEvent;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
@@ -13,16 +16,22 @@ import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.service.DeviceService;
+import org.example.company.tcs.techcellshop.service.OrderService;
+import org.example.company.tcs.techcellshop.service.OrderStatusTransitionValidator;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Service
-public class OrderServiceImpl implements OrderService{
+public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
@@ -30,15 +39,21 @@ public class OrderServiceImpl implements OrderService{
     private final UserRepository userRepository;
     private final DeviceRepository deviceRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final OrderStatusTransitionValidator orderStatusTransitionValidator;
+    private final DeviceService deviceService;
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
+    private final ResponseMapper responseMapper;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
         this.deviceRepository = deviceRepository;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.deviceService = deviceService;
+        this.orderStatusTransitionValidator = orderStatusTransitionValidator;
+        this.responseMapper = responseMapper;
     }
 
     @Override
@@ -90,28 +105,18 @@ public class OrderServiceImpl implements OrderService{
         orderRepository.delete(existingOrder);
         log.info("Order with id {} deleted successfully", id);
     }
-    
+
     @Transactional
     @Override
     public Order placeOrder(OrderEnrollmentRequest request) {
         User user = userRepository.findById(request.getIdUser())
-                .orElseThrow(() -> {
-                    log.info("No user found with id {}", request.getIdUser());
-                    return new ResourceNotFoundException("User not found with id: " + request.getIdUser());
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getIdUser()));
+
         Device device = deviceRepository.findById(request.getIdDevice())
-                .orElseThrow(() -> {
-                    log.info("No device found with id {}", request.getIdDevice());
-                    return new ResourceNotFoundException("Device not found with id: " + request.getIdDevice());
-                });
-        
+                .orElseThrow(() -> new ResourceNotFoundException("Device not found with id: " + request.getIdDevice()));
+
         Integer quantity = request.getQuantityOrder();
-        if (device.getDeviceStock() < quantity) {
-            log.info("The requested quantity of the product {} is unavailable. Stock available: {}", device.getNameDevice(), device.getDeviceStock());
-            throw new InsufficientStockException("The requested quantity of the product "+ device.getNameDevice() +" is unavailable. Stock available: " + device.getDeviceStock());
-        }
-        device.setDeviceStock(device.getDeviceStock() - quantity);
-        deviceRepository.save(device);
+        deviceService.reserveStock(device.getIdDevice(), quantity);
 
         Order order = new Order();
         order.setUser(user);
@@ -119,17 +124,73 @@ public class OrderServiceImpl implements OrderService{
         order.setQuantityOrder(quantity);
         order.setPaymentMethod(request.getPaymentMethod());
 
-        // Server-controlled fields
-        order.setStatusOrder("CREATED");
-        order.setPaymentStatus("PENDING");
+        order.setStatus(OrderStatus.CREATED);
+        order.setPaymentStatus(PaymentStatus.PENDING);
         order.setOrderDate(LocalDate.now().toString());
         order.setDeliveryDate(LocalDate.now().plusDays(5).toString());
 
         double total = device.getDevicePrice() * quantity;
         order.setTotalPriceOrder(total);
+        order.setDiscountAmount(BigDecimal.ZERO);
+        order.setFinalAmount(BigDecimal.valueOf(total));
 
         Order saved = orderRepository.save(order);
         applicationEventPublisher.publishEvent(new OrderCreatedDomainEvent(saved));
+
         return saved;
+    }
+
+    private Order getOrderOrThrow(Long orderId){
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.info(ORDER_NOT_FOUND + orderId);
+                    return new ResourceNotFoundException(ORDER_NOT_FOUND + orderId);
+                });
+    }
+
+    @Transactional
+    @Override
+    public OrderResponse updateStatus(Long orderId, OrderStatus newStatus, String reason){
+        if (newStatus.equals(OrderStatus.CANCELED)){
+            return cancelOrder(orderId, reason);
+        }
+
+        Order order = getOrderOrThrow(orderId);
+        orderStatusTransitionValidator.validateTransition(order.getStatus(), newStatus);
+
+        if (newStatus.equals(OrderStatus.SHIPPED) && !order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)){
+            throw new InvalidOrderStatusTransitionException("Order cannot be shipped without confirmed payment");
+        }
+
+        order.setStatus(newStatus);
+        Order orderUpdated = orderRepository.save(order);
+
+        return responseMapper.toOrderResponse(orderUpdated);
+    }
+
+    @Transactional
+    @Override
+    public OrderResponse cancelOrder(Long orderId, String reason){
+        Order order = getOrderOrThrow(orderId);
+        if (order.getStatus().equals(OrderStatus.CANCELED)){
+            return responseMapper.toOrderResponse(order);
+        }
+
+        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)){
+            throw new InvalidOrderStatusTransitionException("Cannot cancel an order that has already been shipped or delivered");
+        }
+
+        order.setStatus(OrderStatus.CANCELED);
+        order.setCanceledReason((reason == null || reason.isBlank()) ? "Order canceled by the user" : reason);
+
+        deviceService.releaseStock(order.getDevice().getIdDevice(), order.getQuantityOrder());
+        Order updatedOrder = orderRepository.save(order);
+        return responseMapper.toOrderResponse(updatedOrder);
+
+    }
+
+    @Override
+    public OrderResponse applyCoupon(Long orderId, String couponCode) {
+        throw new RuntimeException("Method still not implemented");
     }
 }

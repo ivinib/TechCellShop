@@ -4,6 +4,7 @@ import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateReq
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

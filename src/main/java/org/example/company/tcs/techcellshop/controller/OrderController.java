@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.example.company.tcs.techcellshop.controller.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
@@ -131,5 +132,26 @@ public class OrderController {
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderStatusUpdateRequestDto request) {
+        return ResponseEntity.ok(orderService.updateStatus(id, request.getNewStatus(), request.getReason()));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<OrderResponse> cancelOrder(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(orderService.cancelOrder(id, reason));
+    }
+
+    @PostMapping("/{id}/apply-coupon")
+    public ResponseEntity<OrderResponse> applyCoupon(
+            @PathVariable Long id,
+            @RequestParam String code) {
+        return ResponseEntity.ok(orderService.applyCoupon(id, code));
     }
 }

@@ -1,10 +1,12 @@
-package org.example.company.tcs.techcellshop.service;
+package org.example.company.tcs.techcellshop.service.impl;
 
 import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -12,7 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-public class DeviceServiceImpl implements DeviceService{
+public class DeviceServiceImpl implements DeviceService {
 
     private final DeviceRepository deviceRepository;
     private static final Logger log = LoggerFactory.getLogger(DeviceServiceImpl.class);
@@ -34,7 +36,7 @@ public class DeviceServiceImpl implements DeviceService{
     public Device getDeviceById(Long id) {
         return deviceRepository.findById(id).orElseThrow(() -> {
             log.info("No device found with id {}", id);
-            return new RuntimeException("Device not found with id " + id);
+            return new ResourceNotFoundException("Device not found with id " + id);
         });
     }
 
@@ -69,5 +71,27 @@ public class DeviceServiceImpl implements DeviceService{
 
         deviceRepository.delete(existingDevice);
         log.info("Device with id {} deleted successfully", id);
+    }
+
+    @Override
+    public void reserveStock(Long deviceId, Integer quantity) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Device not found with id: " + deviceId));
+
+        if (device.getDeviceStock() < quantity) {
+            throw new InsufficientStockException(String.format("Insufficient stock for device id %d. Available: %d, Requested: %d", deviceId, device.getDeviceStock(), quantity));
+        }
+
+        device.setDeviceStock(device.getDeviceStock() - quantity);
+        deviceRepository.save(device);
+    }
+
+    @Override
+    public void releaseStock(Long deviceId, Integer quantity) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Device not found with id: " + deviceId));
+
+        device.setDeviceStock(device.getDeviceStock() + quantity);
+        deviceRepository.save(device);
     }
 }

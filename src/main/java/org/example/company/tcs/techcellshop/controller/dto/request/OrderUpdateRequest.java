@@ -3,6 +3,8 @@ package org.example.company.tcs.techcellshop.controller.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
 
 @Data
 public class OrderUpdateRequest {
@@ -18,18 +20,18 @@ public class OrderUpdateRequest {
             regexp = "^(CREATED|PROCESSING|SHIPPED|DELIVERED|CANCELLED)$",
             message = "Invalid order status"
     )
-    private String statusOrder;
+    private OrderStatus statusOrder;
 
     @Schema(example = "2024-12-31", description = "Expected delivery date in yyyy-MM-dd format")
     @NotBlank(message = "Delivery date is required")
     @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "Delivery date must be yyyy-MM-dd")
     private String deliveryDate;
 
-    @Schema(example = "PAID", description = "Payment status of the order")
+    @Schema(example = "CONFIRMWS", description = "Payment status of the order")
     @NotBlank(message = "Payment status is required")
     @Pattern(
             regexp = "^(PENDING|AUTHORIZED|PAID|FAILED|REFUNDED)$",
             message = "Invalid payment status"
     )
-    private String paymentStatus;
+    private PaymentStatus paymentStatus;
 }

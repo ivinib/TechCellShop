@@ -11,4 +11,6 @@ public interface DeviceService {
     List<Device> getAllDevices();
     Device updateDevice(Long id, DeviceUpdateRequest request);
     void deleteDevice(Long id);
+    void reserveStock(Long deviceId, Integer quantity);
+    void releaseStock(Long deviceId, Integer quantity);
 }

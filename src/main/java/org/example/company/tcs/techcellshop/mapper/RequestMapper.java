@@ -67,7 +67,7 @@ public class RequestMapper {
 
     public void updateOrder(Order order, OrderUpdateRequest request) {
         order.setQuantityOrder(request.getQuantityOrder());
-        order.setStatusOrder(request.getStatusOrder());
+        order.setStatus(request.getStatusOrder());
         order.setDeliveryDate(request.getDeliveryDate());
         order.setPaymentStatus(request.getPaymentStatus());
     }

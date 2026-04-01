@@ -4,6 +4,7 @@ import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateR
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.service.impl.DeviceServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
+
+import java.math.BigDecimal;
 
 @Entity(name = "tb_order")
 @Data
@@ -30,8 +34,9 @@ public class Order {
     @Column(name = "total_price_order")
     private Double totalPriceOrder;
 
-    @Column(name = "status_order")
-    private String statusOrder;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_order", nullable = false, length = 20)
+    private OrderStatus status;
 
     @Column(name = "order_date")
     private String orderDate;
@@ -42,6 +47,19 @@ public class Order {
     @Column(name = "payment_method")
     private String paymentMethod;
 
-    @Column(name = "payment_status")
-    private String paymentStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status_order", length = 20)
+    private PaymentStatus paymentStatus;
+
+    @Column(name = "canceled_reason_order", length = 255)
+    private String canceledReason;
+
+    @Column(name = "coupon_code_order", length = 50)
+    private String couponCode;
+
+    @Column(name = "discount_amount_order", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "final_amount_order", precision = 12, scale = 2)
+    private BigDecimal finalAmount;
 }

@@ -2,7 +2,9 @@ package org.example.company.tcs.techcellshop.service;
 
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
 
 import java.util.List;
 
@@ -13,4 +15,7 @@ public interface OrderService {
     Order updateOrder(Long id, OrderUpdateRequest request);
     void deleteOrder(Long id);
     Order placeOrder(OrderEnrollmentRequest request);
+    OrderResponse updateStatus(Long orderId, OrderStatus newStatus, String reason);
+    OrderResponse cancelOrder(Long orderId, String reason);
+    OrderResponse applyCoupon(Long orderId, String couponCode);
 }
