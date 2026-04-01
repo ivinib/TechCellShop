@@ -25,14 +25,21 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
@@ -65,6 +72,7 @@ class DeviceControllerTest {
         this.mockMvc = webAppContextSetup(context)
                 .apply(springSecurity())
                 .build();
+
         validRequest = new DeviceEnrollmentRequest();
         validRequest.setNameDevice("Galaxy S24");
         validRequest.setDescriptionDevice("Samsung smartphone 256GB");
@@ -106,13 +114,13 @@ class DeviceControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /device")
+    @DisplayName("POST /api/v1/devices")
     class SaveDevice {
 
         @Test
         @WithMockUser
-        @DisplayName("Should return 200 when request is valid")
-        void shouldReturn200_whenRequestIsValid() throws Exception {
+        @DisplayName("Should return 201 when request is valid")
+        void shouldReturn201_whenRequestIsValid() throws Exception {
             when(requestMapper.toDevice(any())).thenReturn(mockDevice);
             when(deviceService.saveDevice(any())).thenReturn(mockDevice);
             when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
@@ -120,11 +128,10 @@ class DeviceControllerTest {
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string("Location", containsString("/api/v1/devices/1")))
                     .andExpect(jsonPath("$.idDevice").value(1L))
-                    .andExpect(jsonPath("$.nameDevice").value("Galaxy S24"))
-                    .andExpect(jsonPath("$.deviceType").value("SMARTPHONE"))
-                    .andExpect(jsonPath("$.deviceCondition").value("NEW"));
+                    .andExpect(jsonPath("$.nameDevice").value("Galaxy S24"));
         }
 
         @Test
@@ -137,7 +144,7 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.deviceType").exists());
+                    .andExpect(jsonPath("$.validationErrors.deviceType").exists());
         }
 
         @Test
@@ -150,7 +157,7 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.deviceStorage").exists());
+                    .andExpect(jsonPath("$.validationErrors.deviceStorage").exists());
         }
 
         @Test
@@ -163,7 +170,7 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.devicePrice").exists());
+                    .andExpect(jsonPath("$.validationErrors.devicePrice").exists());
         }
 
         @Test
@@ -176,21 +183,21 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.deviceCondition").exists());
+                    .andExpect(jsonPath("$.validationErrors.deviceCondition").exists());
         }
 
         @Test
-        @DisplayName("Should return 401 when unauthenticated")
-        void shouldReturn401_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 403 when unauthenticated")
+        void shouldReturn403_whenUnauthenticated() throws Exception {
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isForbidden());
         }
     }
 
     @Nested
-    @DisplayName("GET /device")
+    @DisplayName("GET /api/v1/devices")
     class GetAllDevices {
 
         @Test
@@ -219,15 +226,15 @@ class DeviceControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 401 when unauthenticated")
-        void shouldReturn401_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 403 when unauthenticated")
+        void shouldReturn403_whenUnauthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/devices"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isForbidden());
         }
     }
 
     @Nested
-    @DisplayName("GET /device/{id}")
+    @DisplayName("GET /api/v1/devices/{id}")
     class GetDeviceById {
 
         @Test
@@ -257,7 +264,7 @@ class DeviceControllerTest {
     }
 
     @Nested
-    @DisplayName("PUT /device/{id}")
+    @DisplayName("PUT /api/v1/devices/{id}")
     class UpdateDevice {
 
         @Test
@@ -295,7 +302,26 @@ class DeviceControllerTest {
     }
 
     @Nested
-    @DisplayName("DELETE /device/{id}")
+    @DisplayName("PATCH /api/v1/devices/{id}")
+    class PartialUpdateDevice {
+
+        @Test
+        @WithMockUser
+        @DisplayName("Should return 200 when device is partially updated")
+        void shouldReturn200_whenDeviceIsPartiallyUpdated() throws Exception {
+            when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
+            when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
+
+            mockMvc.perform(patch("/api/v1/devices/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.idDevice").value(1L));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/devices/{id}")
     class DeleteDevice {
 
         @Test

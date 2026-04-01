@@ -34,7 +34,7 @@ public class OrderMessagingPublisher {
                 order.getQuantityOrder(),
                 order.getTotalPriceOrder(),
                 order.getPaymentMethod(),
-                order.getStatusOrder(),
+                order.getStatus(),
                 order.getPaymentStatus(),
                 Instant.now()
         );

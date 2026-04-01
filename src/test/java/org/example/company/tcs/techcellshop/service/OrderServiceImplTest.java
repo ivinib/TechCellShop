@@ -8,6 +8,8 @@ import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.service.impl.OrderServiceImpl;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,11 +57,11 @@ class OrderServiceImplTest {
         order.setDevice(device);
         order.setQuantityOrder(2);
         order.setTotalPriceOrder(7999.80);
-        order.setStatusOrder("CREATED");
+        order.setStatus(OrderStatus.CREATED);
         order.setOrderDate("2026-03-24");
         order.setDeliveryDate("2026-03-31");
         order.setPaymentMethod("CREDIT_CARD");
-        order.setPaymentStatus("PENDING");
+        order.setPaymentStatus(PaymentStatus.PENDING);
     }
 
     @Test
@@ -69,7 +71,7 @@ class OrderServiceImplTest {
         Order result = orderService.saveOrder(order);
 
         assertThat(result.getIdOrder()).isEqualTo(1L);
-        assertThat(result.getStatusOrder()).isEqualTo("CREATED");
+        assertThat(result.getStatus()).isEqualTo("CREATED");
         assertThat(result.getPaymentMethod()).isEqualTo("CREDIT_CARD");
         verify(orderRepository).save(order);
     }
@@ -100,7 +102,7 @@ class OrderServiceImplTest {
         List<Order> result = orderService.getAllOrders();
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().getStatusOrder()).isEqualTo("CREATED");
+        assertThat(result.getFirst().getStatus()).isEqualTo("CREATED");
     }
 
     @Test
@@ -116,9 +118,9 @@ class OrderServiceImplTest {
     void updateOrder_whenOrderExists_shouldApplyUpdateRequestAndReturn() {
         OrderUpdateRequest updateRequest = new OrderUpdateRequest();
         updateRequest.setQuantityOrder(3);
-        updateRequest.setStatusOrder("PROCESSING");
+        updateRequest.setStatusOrder(OrderStatus.PAID);
         updateRequest.setDeliveryDate("2026-04-07");
-        updateRequest.setPaymentStatus("PAID");
+        updateRequest.setPaymentStatus(PaymentStatus.AUTHORIZED);
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
@@ -126,7 +128,7 @@ class OrderServiceImplTest {
             Order target = invocation.getArgument(0);
             OrderUpdateRequest req = invocation.getArgument(1);
             target.setQuantityOrder(req.getQuantityOrder());
-            target.setStatusOrder(req.getStatusOrder());
+            target.setStatus(req.getStatusOrder());
             target.setDeliveryDate(req.getDeliveryDate());
             target.setPaymentStatus(req.getPaymentStatus());
             return null;
@@ -137,7 +139,7 @@ class OrderServiceImplTest {
         Order result = orderService.updateOrder(1L, updateRequest);
 
         assertThat(result.getQuantityOrder()).isEqualTo(3);
-        assertThat(result.getStatusOrder()).isEqualTo("PROCESSING");
+        assertThat(result.getStatus()).isEqualTo("PROCESSING");
         assertThat(result.getDeliveryDate()).isEqualTo("2026-04-07");
         assertThat(result.getPaymentStatus()).isEqualTo("PAID");
 
@@ -149,9 +151,9 @@ class OrderServiceImplTest {
     void updateOrder_whenOrderNotFound_shouldThrowResourceNotFoundException() {
         OrderUpdateRequest updateRequest = new OrderUpdateRequest();
         updateRequest.setQuantityOrder(2);
-        updateRequest.setStatusOrder("PROCESSING");
+        updateRequest.setStatusOrder(OrderStatus.SHIPPED);
         updateRequest.setDeliveryDate("2026-04-01");
-        updateRequest.setPaymentStatus("AUTHORIZED");
+        updateRequest.setPaymentStatus(PaymentStatus.AUTHORIZED);
 
         when(orderRepository.findById(99L)).thenReturn(Optional.empty());
 

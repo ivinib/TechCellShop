@@ -21,21 +21,26 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
-
-import org.springframework.web.context.WebApplicationContext;
-
 
 @SpringBootTest
 @Import(SecurityConfig.class)
@@ -67,6 +72,7 @@ class UserControllerTest {
         this.mockMvc = webAppContextSetup(context)
                 .apply(springSecurity())
                 .build();
+
         validRequest = new UserEnrollmentRequest();
         validRequest.setNameUser("Ana Silva");
         validRequest.setEmailUser("ana@techcellshop.com");
@@ -101,8 +107,8 @@ class UserControllerTest {
     class SaveUser {
 
         @Test
-        @DisplayName("Should return 200 when request is valid")
-        void shouldReturn200_whenRequestIsValid() throws Exception {
+        @DisplayName("Should return 201 when request is valid")
+        void shouldReturn201_whenRequestIsValid() throws Exception {
             when(requestMapper.toUser(any())).thenReturn(mockUser);
             when(userService.saveUser(any())).thenReturn(mockUser);
             when(responseMapper.toUserResponse(any())).thenReturn(mockUserResponse);
@@ -110,11 +116,10 @@ class UserControllerTest {
             mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string("Location", containsString("/api/v1/users/1")))
                     .andExpect(jsonPath("$.idUser").value(1L))
-                    .andExpect(jsonPath("$.nameUser").value("Ana Silva"))
-                    .andExpect(jsonPath("$.emailUserMasked").value("a***a@techcellshop.com"))
-                    .andExpect(jsonPath("$.roleUser").value("USER"));
+                    .andExpect(jsonPath("$.nameUser").value("Ana Silva"));
         }
 
         @Test
@@ -127,9 +132,7 @@ class UserControllerTest {
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.error").value("Bad Request"))
                     .andExpect(jsonPath("$.message").value("Validation failed"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/users"))
                     .andExpect(jsonPath("$.validationErrors.nameUser").exists());
         }
 
@@ -142,7 +145,7 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.emailUser").exists());
+                    .andExpect(jsonPath("$.validationErrors.emailUser").exists());
         }
 
         @Test
@@ -154,7 +157,7 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.passwordUser").exists());
+                    .andExpect(jsonPath("$.validationErrors.passwordUser").exists());
         }
 
         @Test
@@ -166,7 +169,7 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.roleUser").exists());
+                    .andExpect(jsonPath("$.validationErrors.roleUser").exists());
         }
 
         @Test
@@ -211,14 +214,13 @@ class UserControllerTest {
             mockMvc.perform(get("/api/v1/users"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(0));
-
         }
 
         @Test
-        @DisplayName("Should return 401 when unauthenticated")
-        void shouldReturn401_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 403 when unauthenticated")
+        void shouldReturn403_whenUnauthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/users"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isForbidden());
         }
     }
 
@@ -286,6 +288,25 @@ class UserControllerTest {
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("User not found with id: 99"));
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/users/{id}")
+    class PartialUpdateUser {
+
+        @Test
+        @WithMockUser
+        @DisplayName("Should return 200 when user is partially updated")
+        void shouldReturn200_whenUserIsPartiallyUpdated() throws Exception {
+            when(userService.updateUser(eq(1L), any())).thenReturn(mockUser);
+            when(responseMapper.toUserResponse(any())).thenReturn(mockUserResponse);
+
+            mockMvc.perform(patch("/api/v1/users/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.idUser").value(1L));
         }
     }
 

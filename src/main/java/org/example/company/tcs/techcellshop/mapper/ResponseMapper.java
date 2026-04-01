@@ -67,7 +67,7 @@ public class ResponseMapper {
                 deviceSummary,
                 order.getQuantityOrder(),
                 order.getTotalPriceOrder(),
-                order.getStatusOrder(),
+                order.getStatus(),
                 order.getOrderDate(),
                 order.getDeliveryDate(),
                 order.getPaymentMethod(),

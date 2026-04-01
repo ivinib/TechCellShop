@@ -1,5 +1,8 @@
 package org.example.company.tcs.techcellshop.messaging;
 
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
+
 import java.time.Instant;
 
 public record OrderCreatedEvent(
@@ -10,7 +13,7 @@ public record OrderCreatedEvent(
         Integer quantity,
         Double totalPrice,
         String paymentMethod,
-        String status,
-        String paymentStatus,
+        OrderStatus status,
+        PaymentStatus paymentStatus,
         Instant occurredAt
 ) {}

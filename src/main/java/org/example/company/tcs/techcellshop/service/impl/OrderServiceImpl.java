@@ -221,6 +221,6 @@ public class OrderServiceImpl implements OrderService {
         Order saved = orderRepository.save(order);
         couponService.registerCouponUsage(couponCode);
 
-        responseMapper.toOrderResponse(saved);
+        return responseMapper.toOrderResponse(saved);
     }
 }

@@ -4,6 +4,8 @@ import org.example.company.tcs.techcellshop.controller.dto.response.*;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,11 +50,11 @@ class ResponseMapperTest {
         order.setDevice(device);
         order.setQuantityOrder(2);
         order.setTotalPriceOrder(7999.80);
-        order.setStatusOrder("CREATED");
+        order.setStatus(OrderStatus.CREATED);
         order.setOrderDate("2026-03-24");
         order.setDeliveryDate("2026-03-31");
         order.setPaymentMethod("CREDIT_CARD");
-        order.setPaymentStatus("PENDING");
+        order.setPaymentStatus(PaymentStatus.PENDING);
     }
 
     @Test
