@@ -8,4 +8,5 @@ public interface CouponService {
 
     CouponValidationResponseDto validateCoupon(String code, BigDecimal orderAmount);
     BigDecimal calculateDiscount(String code, BigDecimal orderAmount);
+    void registerCouponUsage(String code);
 }

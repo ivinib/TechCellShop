@@ -2,6 +2,7 @@ package org.example.company.tcs.techcellshop.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.example.company.tcs.techcellshop.util.DiscountType;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;

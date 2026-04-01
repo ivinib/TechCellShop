@@ -2,6 +2,7 @@ package org.example.company.tcs.techcellshop.service.impl;
 
 import jakarta.transaction.Transactional;
 import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.exception.CouponValidationException;
 import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.messaging.OrderCreatedDomainEvent;
@@ -10,12 +11,12 @@ import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRe
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
-import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.service.CouponService;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.service.OrderStatusTransitionValidator;
@@ -44,8 +45,9 @@ public class OrderServiceImpl implements OrderService {
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
     private final ResponseMapper responseMapper;
+    private final CouponService couponService;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
@@ -54,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
         this.deviceService = deviceService;
         this.orderStatusTransitionValidator = orderStatusTransitionValidator;
         this.responseMapper = responseMapper;
+        this.couponService = couponService;
     }
 
     @Override
@@ -189,8 +192,35 @@ public class OrderServiceImpl implements OrderService {
 
     }
 
+    @Transactional
     @Override
     public OrderResponse applyCoupon(Long orderId, String couponCode) {
-        throw new RuntimeException("Method still not implemented");
+        Order order = getOrderOrThrow(orderId);
+
+        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED) || order.getStatus().equals(OrderStatus.CANCELED)){
+            throw new CouponValidationException("Coupon cannot be applied for orders that are in shipped, delivered or canceled status");
+        } else if (null != order.getCouponCode() && !order.getCouponCode().isBlank()) {
+            if (order.getCouponCode().equalsIgnoreCase(couponCode)){
+                return responseMapper.toOrderResponse(order);
+            }
+            throw new CouponValidationException("An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode());
+        }
+
+        BigDecimal orderAmount = BigDecimal.valueOf(order.getTotalPriceOrder());
+        BigDecimal discount = couponService.calculateDiscount(couponCode, orderAmount);
+        BigDecimal finalAmount = orderAmount.subtract(discount);
+
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0){
+            finalAmount = BigDecimal.ZERO;
+        }
+
+        order.setCouponCode(couponCode);
+        order.setDiscountAmount(discount);
+        order.setFinalAmount(finalAmount);
+
+        Order saved = orderRepository.save(order);
+        couponService.registerCouponUsage(couponCode);
+
+        responseMapper.toOrderResponse(saved);
     }
 }

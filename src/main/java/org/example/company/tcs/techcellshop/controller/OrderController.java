@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.example.company.tcs.techcellshop.controller.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
@@ -151,7 +152,7 @@ public class OrderController {
     @PostMapping("/{id}/apply-coupon")
     public ResponseEntity<OrderResponse> applyCoupon(
             @PathVariable Long id,
-            @RequestParam String code) {
+            @RequestParam @NotBlank String code) {
         return ResponseEntity.ok(orderService.applyCoupon(id, code));
     }
 }
