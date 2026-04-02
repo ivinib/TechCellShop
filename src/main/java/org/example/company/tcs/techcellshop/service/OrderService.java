@@ -18,4 +18,5 @@ public interface OrderService {
     OrderResponse updateStatus(Long orderId, OrderStatus newStatus, String reason);
     OrderResponse cancelOrder(Long orderId, String reason);
     OrderResponse applyCoupon(Long orderId, String couponCode);
+    Order placeOrder(OrderEnrollmentRequest request, String idempotencyKey);
 }

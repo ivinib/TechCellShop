@@ -61,18 +61,14 @@ public class CouponServiceImpl  implements CouponService {
     @Transactional
     @Override
     public void registerCouponUsage(String code) {
-        Coupon coupon = couponRepository.findByCodeIgnoreCase(code)
-                .orElseThrow(() -> new CouponValidationException("Invalid coupon code: " + code));
+        if (!couponRepository.existsByCodeIgnoreCase(code)) {
+            throw new CouponValidationException("Invalid coupon code: " + code);
+        }
 
-        Integer quantityUsed = (null == coupon.getUsedCount()) ? 0 : coupon.getUsedCount();
-        Integer usageLimit = coupon.getMaxUses();
-
-        if (null != usageLimit && quantityUsed >= usageLimit) {
+        int updatedRows = couponRepository.incrementUsageIfAvailable(code);
+        if (updatedRows == 0) {
             throw new CouponValidationException("Coupon usage limit reached for code: " + code);
         }
-        coupon.setUsedCount(quantityUsed + 1);
-        couponRepository.save(coupon);
-
     }
 
     private void validateCouponRules(Coupon coupon, BigDecimal orderAmount){

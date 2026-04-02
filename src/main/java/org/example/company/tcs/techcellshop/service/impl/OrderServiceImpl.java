@@ -2,6 +2,7 @@ package org.example.company.tcs.techcellshop.service.impl;
 
 import jakarta.transaction.Transactional;
 import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.domain.OrderIdempondency;
 import org.example.company.tcs.techcellshop.exception.CouponValidationException;
 import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
@@ -14,6 +15,7 @@ import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.CouponService;
@@ -32,7 +34,12 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.HexFormat;
 import java.util.List;
 
 @Service
@@ -46,12 +53,13 @@ public class OrderServiceImpl implements OrderService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final OrderStatusTransitionValidator orderStatusTransitionValidator;
     private final DeviceService deviceService;
+    private final OrderIdempondencyRepository orderIdempondencyRepository;
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
     private final ResponseMapper responseMapper;
     private final CouponService couponService;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
@@ -61,6 +69,7 @@ public class OrderServiceImpl implements OrderService {
         this.orderStatusTransitionValidator = orderStatusTransitionValidator;
         this.responseMapper = responseMapper;
         this.couponService = couponService;
+        this.orderIdempondencyRepository = orderIdempondencyRepository;
     }
 
     @Override
@@ -231,5 +240,48 @@ public class OrderServiceImpl implements OrderService {
         couponService.registerCouponUsage(couponCode);
 
         return responseMapper.toOrderResponse(saved);
+    }
+
+    @Transactional
+    @Override
+    public Order placeOrder(OrderEnrollmentRequest request, String idempotencyKey) {
+        String normalisedIdempotencyKey = idempotencyKey.trim();
+
+        var existing = orderIdempondencyRepository.findByIdempotencyKey(normalisedIdempotencyKey);
+        if (existing.isPresent()){
+            Order existingOrder = existing.get().getOrder();
+
+            String currentHash = computeRequestHash(request);
+            if (!existing.get().getRequestHash().equals(currentHash)){
+                throw new IllegalStateException("Idempotency key already used for a different request");
+            }
+            return existingOrder;
+        }
+
+        Order created = placeOrder(request);
+        OrderIdempondency record = new OrderIdempondency();
+
+        record.setIdempotencyKey(normalisedIdempotencyKey);
+        record.setRequestHash(computeRequestHash(request));
+        record.setOrder(created);
+        record.setCreatedAt(OffsetDateTime.now());
+        orderIdempondencyRepository.save(record);
+
+        return created;
+    }
+
+    private String computeRequestHash(OrderEnrollmentRequest request) {
+        String raw = request.getIdUser() + "|" +
+                request.getIdDevice() + "|" +
+                request.getQuantityOrder() + "|" +
+                request.getPaymentMethod();
+
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = messageDigest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available");
+        }
     }
 }
