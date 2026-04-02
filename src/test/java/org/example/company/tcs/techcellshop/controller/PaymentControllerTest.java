@@ -118,7 +118,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /payments/orders/{id}/confirm should return 400 when amount is invalid")
     void confirm_shouldReturn400_whenInvalidPayload() throws Exception {
         validRequest.setAmount(new BigDecimal("0.00"));
@@ -145,6 +145,24 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /payments/orders/{id}/confirm should return 401 when token is malformed")
+    void confirm_shouldReturn401_whenTokenIsMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
+                        .header("Authorization", "Bearer not-a-valid-jwt")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 }
