@@ -13,5 +13,9 @@ public record OrderResponse (
         String orderDate,
         String deliveryDate,
         String paymentMethod,
-        PaymentStatus paymentStatus
+        PaymentStatus paymentStatus,
+        String couponCode,
+        java.math.BigDecimal discountAmount,
+        java.math.BigDecimal finalAmount,
+        String canceledReason
 ){}

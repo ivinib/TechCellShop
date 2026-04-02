@@ -68,6 +68,12 @@ public class UserServiceImpl implements UserService {
                     return new ResourceNotFoundException("User not found with id: " + id);
                 });
 
+        boolean emailChanged = !existingUser.getEmailUser()
+                .equalsIgnoreCase(request.getEmailUser());
+        if (emailChanged && userRepository.existsByEmailUserIgnoreCase(request.getEmailUser())) {
+            throw new IllegalArgumentException("A user with this email already exists");
+        }
+
         requestMapper.updateUser(existingUser, request);
         User updatedUser = userRepository.save(existingUser);
         log.info("User with id {} updated successfully", id);

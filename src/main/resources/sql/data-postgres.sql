@@ -61,7 +61,7 @@ VALUES (1, 1, 1, 1, 3999.90, 'CREATED', '2026-03-23', '2026-03-27', 'PIX', 'PAID
                                   payment_status = EXCLUDED.payment_status;
 
 INSERT INTO tb_order (id_order, id_user, id_device, quantity_order, total_price_order, status_order, order_date, delivery_date, payment_method, payment_status)
-VALUES (2, 2, 2, 1, 8999.00, 'PROCESSING', '2026-03-23', '2026-03-29', 'CREDIT_CARD', 'AUTHORIZED')
+VALUES (2, 2, 2, 1, 8999.00, 'CREATED', '2026-03-23', '2026-03-29', 'CREDIT_CARD', 'PENDING')
     ON CONFLICT (id_order) DO UPDATE SET
     id_user = EXCLUDED.id_user,
                                   id_device = EXCLUDED.id_device,

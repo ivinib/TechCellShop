@@ -71,7 +71,11 @@ public class ResponseMapper {
                 order.getOrderDate(),
                 order.getDeliveryDate(),
                 order.getPaymentMethod(),
-                order.getPaymentStatus()
+                order.getPaymentStatus(),
+                order.getCouponCode(),
+                order.getDiscountAmount(),
+                order.getFinalAmount(),
+                order.getCanceledReason()
         );
     }
 

@@ -54,6 +54,7 @@ public class PaymentServiceImpl implements PaymentService {
         return toResponse(order);
     }
 
+    @Transactional
     @Override
     public PaymentResponseDto failPayment(Long orderId, PaymentActionRequestDto request) {
         Order order = getOrderOrThrow(orderId);
@@ -78,6 +79,7 @@ public class PaymentServiceImpl implements PaymentService {
         return toResponse(order);
     }
 
+    @Transactional
     @Override
     public PaymentResponseDto refundPayment(Long orderId, PaymentActionRequestDto request) {
         Order order = getOrderOrThrow(orderId);

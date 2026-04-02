@@ -65,7 +65,7 @@ class CouponControllerTest {
         when(couponService.validateCoupon("WELCOME10", new BigDecimal("3999.90")))
                 .thenReturn(response);
 
-        mockMvc.perform(post("/coupons/validate")
+        mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
@@ -79,7 +79,7 @@ class CouponControllerTest {
     void validate_shouldReturn400_whenCodeBlank() throws Exception {
         validRequest.setCode(" ");
 
-        mockMvc.perform(post("/coupons/validate")
+        mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isBadRequest())
@@ -92,7 +92,7 @@ class CouponControllerTest {
     void validate_shouldReturn400_whenAmountInvalid() throws Exception {
         validRequest.setOrderAmount(new BigDecimal("0.00"));
 
-        mockMvc.perform(post("/coupons/validate")
+        mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isBadRequest())
@@ -102,7 +102,7 @@ class CouponControllerTest {
     @Test
     @DisplayName("POST /coupons/validate should require authentication")
     void validate_shouldReject_whenUnauthenticated() throws Exception {
-        mockMvc.perform(post("/coupons/validate")
+        mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isForbidden());

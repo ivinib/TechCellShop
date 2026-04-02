@@ -71,7 +71,7 @@ class PaymentControllerTest {
         when(paymentService.confirmPayment(eq(1L), any(PaymentActionRequestDto.class)))
                 .thenReturn(confirmedResponse);
 
-        mockMvc.perform(post("/payments/orders/1/confirm")
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
@@ -91,7 +91,7 @@ class PaymentControllerTest {
         when(paymentService.failPayment(eq(1L), any(PaymentActionRequestDto.class)))
                 .thenReturn(failed);
 
-        mockMvc.perform(post("/payments/orders/1/fail")
+        mockMvc.perform(post("/api/v1/payments/orders/1/fail")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
@@ -110,7 +110,7 @@ class PaymentControllerTest {
         when(paymentService.refundPayment(eq(1L), any(PaymentActionRequestDto.class)))
                 .thenReturn(refunded);
 
-        mockMvc.perform(post("/payments/orders/1/refund")
+        mockMvc.perform(post("/api/v1/payments/orders/1/refund")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
@@ -123,7 +123,7 @@ class PaymentControllerTest {
     void confirm_shouldReturn400_whenInvalidPayload() throws Exception {
         validRequest.setAmount(new BigDecimal("0.00"));
 
-        mockMvc.perform(post("/payments/orders/1/confirm")
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isBadRequest())
@@ -133,7 +133,7 @@ class PaymentControllerTest {
     @Test
     @DisplayName("POST /payments/orders/{id}/confirm should require authentication")
     void confirm_shouldReject_whenUnauthenticated() throws Exception {
-        mockMvc.perform(post("/payments/orders/1/confirm")
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isForbidden());

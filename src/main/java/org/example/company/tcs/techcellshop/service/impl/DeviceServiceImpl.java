@@ -1,5 +1,6 @@
 package org.example.company.tcs.techcellshop.service.impl;
 
+import jakarta.transaction.Transactional;
 import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
@@ -73,6 +74,7 @@ public class DeviceServiceImpl implements DeviceService {
         log.info("Device with id {} deleted successfully", id);
     }
 
+    @Transactional
     @Override
     public void reserveStock(Long deviceId, Integer quantity) {
         Device device = deviceRepository.findById(deviceId)
@@ -86,6 +88,7 @@ public class DeviceServiceImpl implements DeviceService {
         deviceRepository.save(device);
     }
 
+    @Transactional
     @Override
     public void releaseStock(Long deviceId, Integer quantity) {
         Device device = deviceRepository.findById(deviceId)
