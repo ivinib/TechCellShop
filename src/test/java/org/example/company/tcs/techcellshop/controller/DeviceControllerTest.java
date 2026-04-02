@@ -259,7 +259,10 @@ class DeviceControllerTest {
 
             mockMvc.perform(get("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
         }
     }
 
@@ -297,7 +300,10 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
         }
     }
 
@@ -343,7 +349,11 @@ class DeviceControllerTest {
 
             mockMvc.perform(delete("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+
         }
     }
 }

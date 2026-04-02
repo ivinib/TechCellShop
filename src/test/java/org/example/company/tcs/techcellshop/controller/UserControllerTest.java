@@ -133,7 +133,11 @@ class UserControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value("Validation failed"))
-                    .andExpect(jsonPath("$.validationErrors.nameUser").exists());
+                    .andExpect(jsonPath("$.validationErrors.nameUser").exists())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+
         }
 
         @Test
@@ -183,7 +187,9 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value("A user with this email already exists"));
+                    .andExpect(jsonPath("$.message").value("A user with this email already exists"))
+                    .andExpect(jsonPath("$.status").value(409))
+                    .andExpect(jsonPath("$.code").value("BUSINESS_CONFLICT"));
         }
     }
 
@@ -250,7 +256,9 @@ class UserControllerTest {
 
             mockMvc.perform(get("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
         }
     }
 
@@ -287,7 +295,9 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
         }
     }
 
@@ -333,7 +343,10 @@ class UserControllerTest {
 
             mockMvc.perform(delete("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
         }
     }
 }

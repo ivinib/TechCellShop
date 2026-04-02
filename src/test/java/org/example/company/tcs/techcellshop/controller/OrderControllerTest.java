@@ -157,7 +157,11 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"));
+                    .andExpect(jsonPath("$.message").value("Validation failed"))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders")) // or /api/v1/orders/1/status
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
         }
     }
 
@@ -209,9 +213,13 @@ class OrderControllerTest {
             when(orderService.getOrderById(99L))
                     .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
 
+
             mockMvc.perform(get("/api/v1/orders/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
         }
     }
 
@@ -262,7 +270,11 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+            ;
         }
     }
 
@@ -308,7 +320,11 @@ class OrderControllerTest {
 
             mockMvc.perform(delete("/api/v1/orders/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"));
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+
         }
     }
 
@@ -358,7 +374,11 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalid)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"));
+                    .andExpect(jsonPath("$.message").value("Validation failed"))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders"))
+                    .andExpect(jsonPath("$.traceId").isNotEmpty());
         }
     }
 
