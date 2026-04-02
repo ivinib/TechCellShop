@@ -38,7 +38,7 @@ public class OutboxPublisherJob {
     private final Counter publishPermanentFailureCounter;
     private final Timer publishTimer;
 
-    public OutboxPublisherJob(OutboxEventRepository outboxEventRepository, RabbitTemplate rabbitTemplate, ObjectMapper objectMapper, @Value("${app.messaging.order-created.exchange}") String exchange, @Value("${app.messaging.order-created.routing-key}") String routingKey, MeterRegistry meterRegistry,) {
+    public OutboxPublisherJob(OutboxEventRepository outboxEventRepository, RabbitTemplate rabbitTemplate, ObjectMapper objectMapper, @Value("${app.messaging.order-created.exchange}") String exchange, @Value("${app.messaging.order-created.routing-key}") String routingKey, MeterRegistry meterRegistry) {
         this.outboxEventRepository = outboxEventRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.objectMapper = objectMapper;
@@ -109,7 +109,7 @@ public class OutboxPublisherJob {
                 }
                 outboxEventRepository.save(event);
             }
-        })
+        });
     }
 
 }

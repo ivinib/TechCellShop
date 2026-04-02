@@ -2,6 +2,7 @@ package org.example.company.tcs.techcellshop.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.example.company.tcs.techcellshop.domain.OutboxEvent;
 import org.example.company.tcs.techcellshop.messaging.OrderCreatedEvent;
 import org.example.company.tcs.techcellshop.messaging.OutboxPublisherJob;
@@ -51,7 +52,8 @@ class OutboxPublisherJobTest {
                 rabbitTemplate,
                 objectMapper,
                 "test.exchange",
-                "test.routing-key"
+                "test.routing-key",
+                new SimpleMeterRegistry()
         );
 
         OrderCreatedEvent event = new OrderCreatedEvent(

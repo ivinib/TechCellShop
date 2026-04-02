@@ -101,3 +101,16 @@ The application exposes runtime metrics through Spring Boot Actuator and Microme
 ### Example
 ```bash
 curl http://localhost:8080/actuator/metrics/techcellshop.orders.placed
+```
+
+## Quality Gate
+
+This project enforces automated quality checks on every PR:
+
+- Build and test with Maven (`clean verify`)
+- JaCoCo coverage report generation
+- Minimum coverage thresholds:
+    - Line: 70%
+    - Branch: 55%
+
+PRs fail if tests fail or coverage drops below thresholds.
