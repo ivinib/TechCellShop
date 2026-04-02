@@ -1,18 +1,13 @@
 package org.example.company.tcs.techcellshop.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
-import org.example.company.tcs.techcellshop.domain.Device;
-import org.example.company.tcs.techcellshop.domain.Order;
-import org.example.company.tcs.techcellshop.domain.OrderIdempondency;
-import org.example.company.tcs.techcellshop.domain.User;
+import org.example.company.tcs.techcellshop.domain.*;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
-import org.example.company.tcs.techcellshop.repository.DeviceRepository;
-import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
-import org.example.company.tcs.techcellshop.repository.OrderRepository;
-import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.repository.*;
 import org.example.company.tcs.techcellshop.service.impl.OrderServiceImpl;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
@@ -42,12 +37,13 @@ class OrderServiceImplTest {
     @Mock private RequestMapper requestMapper;
     @Mock private UserRepository userRepository;
     @Mock private DeviceRepository deviceRepository;
-    @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private DeviceService deviceService;
     @Mock private OrderStatusTransitionValidator orderStatusTransitionValidator;
     @Mock private ResponseMapper responseMapper;
     @Mock private CouponService couponService;
     @Mock private OrderIdempondencyRepository orderIdempondencyRepository;
+    @Mock private OutboxEventRepository outboxEventRepository;
+    @Mock private ObjectMapper objectMapper;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -253,21 +249,25 @@ class OrderServiceImplTest {
 
         @Test
         @DisplayName("new key: should create order and store idempotency record")
-        void shouldCreateOrderAndStoreRecord_whenKeyIsNew() {
+        void shouldCreateOrderAndStoreRecord_whenKeyIsNew() throws Exception {
             when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
                     .thenReturn(Optional.empty());
-
             when(userRepository.findById(1L)).thenReturn(Optional.of(user));
             when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
             doNothing().when(deviceService).reserveStock(any(), any());
             when(orderRepository.save(any(Order.class))).thenReturn(order);
-            doNothing().when(applicationEventPublisher).publishEvent(any());
+
+            // Stub objectMapper so writeToOutbox() doesn't throw
+            when(objectMapper.writeValueAsString(any())).thenReturn("{\"eventId\":\"test\"}");
+            when(outboxEventRepository.save(any(OutboxEvent.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
             when(orderIdempondencyRepository.save(any(OrderIdempondency.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
             Order result = orderService.placeOrder(request, "KEY-001");
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
+            verify(outboxEventRepository).save(any(OutboxEvent.class));  // outbox written
             verify(orderIdempondencyRepository).save(any(OrderIdempondency.class));
         }
 

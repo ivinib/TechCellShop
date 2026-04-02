@@ -1,28 +1,26 @@
 package org.example.company.tcs.techcellshop.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
-import org.example.company.tcs.techcellshop.domain.OrderIdempondency;
+import org.example.company.tcs.techcellshop.domain.*;
 import org.example.company.tcs.techcellshop.exception.CouponValidationException;
 import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.messaging.OrderCreatedDomainEvent;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
-import org.example.company.tcs.techcellshop.domain.Device;
-import org.example.company.tcs.techcellshop.domain.Order;
-import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
-import org.example.company.tcs.techcellshop.repository.DeviceRepository;
-import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
-import org.example.company.tcs.techcellshop.repository.OrderRepository;
-import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.messaging.OrderCreatedEvent;
+import org.example.company.tcs.techcellshop.repository.*;
 import org.example.company.tcs.techcellshop.service.CouponService;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.service.OrderStatusTransitionValidator;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.OutboxEventStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +35,12 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -54,12 +54,14 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusTransitionValidator orderStatusTransitionValidator;
     private final DeviceService deviceService;
     private final OrderIdempondencyRepository orderIdempondencyRepository;
+    private final OutboxEventRepository outboxEventRepository;
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
     private final ResponseMapper responseMapper;
     private final CouponService couponService;
+    private final ObjectMapper objectMapper;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, ApplicationEventPublisher applicationEventPublisher, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository, ObjectMapper objectMapper, OutboxEventRepository outboxEventRepository) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
@@ -70,13 +72,14 @@ public class OrderServiceImpl implements OrderService {
         this.responseMapper = responseMapper;
         this.couponService = couponService;
         this.orderIdempondencyRepository = orderIdempondencyRepository;
+        this.objectMapper = objectMapper;
+        this.outboxEventRepository = outboxEventRepository;
     }
 
     @Override
     public Order saveOrder(Order order) {
         Order savedOrder = orderRepository.save(order);
         log.info("Order saved successfully");
-
         return savedOrder;
     }
 
@@ -101,7 +104,7 @@ public class OrderServiceImpl implements OrderService {
         Order existingOrder = orderRepository.findById(id)
                 .orElseThrow(() -> {
                     log.info(ORDER_NOT_FOUND + id);
-                    return new ResourceNotFoundException(ORDER_NOT_FOUND +  id);
+                    return new ResourceNotFoundException(ORDER_NOT_FOUND + id);
                 });
 
         requestMapper.updateOrder(existingOrder, request);
@@ -156,7 +159,7 @@ public class OrderServiceImpl implements OrderService {
         order.setFinalAmount(BigDecimal.valueOf(total));
 
         Order saved = orderRepository.save(order);
-        applicationEventPublisher.publishEvent(new OrderCreatedDomainEvent(saved));
+        writeToOutbox(saved);
 
         return saved;
     }
@@ -268,6 +271,40 @@ public class OrderServiceImpl implements OrderService {
         orderIdempondencyRepository.save(record);
 
         return created;
+    }
+
+    private void writeToOutbox(Order order) {
+        OrderCreatedEvent event = new OrderCreatedEvent(
+                UUID.randomUUID().toString(),
+                order.getIdOrder(),
+                order.getUser().getIdUser(),
+                order.getDevice().getIdDevice(),
+                order.getQuantityOrder(),
+                order.getTotalPriceOrder(),
+                order.getPaymentMethod(),
+                order.getStatus(),
+                order.getPaymentStatus(),
+                Instant.now()
+        );
+
+        try {
+            OutboxEvent outboxEvent = new OutboxEvent();
+            outboxEvent.setEventId(event.eventId());
+            outboxEvent.setEventType("order.created");
+            outboxEvent.setAggregateType("Order");
+            outboxEvent.setAggregateId(order.getIdOrder());
+            outboxEvent.setPayload(objectMapper.writeValueAsString(event));
+            outboxEvent.setStatus(OutboxEventStatus.PENDING);
+            outboxEvent.setAttempts(0);
+            outboxEvent.setNextAttemptAt(Instant.now());
+            outboxEvent.setCreatedAt(Instant.now());
+
+            outboxEventRepository.save(outboxEvent);
+            log.info("Outbox event written for orderId={}", order.getIdOrder());
+
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize outbox event for orderId=" + order.getIdOrder(), e);
+        }
     }
 
     private String computeRequestHash(OrderEnrollmentRequest request) {
