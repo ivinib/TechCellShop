@@ -65,7 +65,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /payments/orders/{id}/confirm should return 200")
     void confirm_shouldReturn200() throws Exception {
         when(paymentService.confirmPayment(eq(1L), any(PaymentActionRequestDto.class)))
@@ -80,7 +80,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /payments/orders/{id}/fail should return 200")
     void fail_shouldReturn200() throws Exception {
         PaymentResponseDto failed = new PaymentResponseDto();
@@ -99,7 +99,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /payments/orders/{id}/refund should return 200")
     void refund_shouldReturn200() throws Exception {
         PaymentResponseDto refunded = new PaymentResponseDto();
@@ -133,6 +133,15 @@ class PaymentControllerTest {
     @Test
     @DisplayName("POST /payments/orders/{id}/confirm should require authentication")
     void confirm_shouldReject_whenUnauthenticated() throws Exception {
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void confirm_shouldReturn403_whenUserIsNotAdmin() throws Exception {
         mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))

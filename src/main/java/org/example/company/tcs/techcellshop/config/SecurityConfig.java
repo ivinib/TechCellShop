@@ -61,8 +61,26 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
+
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/users/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/devices/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/devices/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/devices/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/devices/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/devices/**").hasRole("ADMIN")
+
+                        .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").hasAnyRole("USER", "CUSTOMER", "ADMIN")
+                        .requestMatchers("/api/v1/payments/**").hasRole("ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .headers(headers -> headers
