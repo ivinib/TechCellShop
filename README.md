@@ -72,3 +72,32 @@ src/main/resources
 ├── application-dev.properties
 └── sql/data-postgres.sql
 
+```
+
+## Observability and Performance Metrics
+
+The application exposes runtime metrics through Spring Boot Actuator and Micrometer.
+
+### Business metrics
+- `techcellshop.orders.placed`
+- `techcellshop.orders.idempotency.hit`
+- `techcellshop.orders.idempotency.conflict`
+- `techcellshop.coupons.usage.conflict`
+
+### Async and messaging metrics
+- `techcellshop.outbox.publish.success`
+- `techcellshop.outbox.publish.failure`
+- `techcellshop.outbox.publish.failed_permanently`
+- `techcellshop.rabbit.order_created.processed`
+- `techcellshop.rabbit.order_created.duplicate`
+
+### Timing metrics
+- `techcellshop.orders.place.duration`
+- `techcellshop.orders.coupon.apply.duration`
+- `techcellshop.coupons.discount.duration`
+- `techcellshop.outbox.publish.duration`
+- `techcellshop.rabbit.order_created.duration`
+
+### Example
+```bash
+curl http://localhost:8080/actuator/metrics/techcellshop.orders.placed

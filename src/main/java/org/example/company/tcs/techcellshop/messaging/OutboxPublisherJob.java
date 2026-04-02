@@ -2,6 +2,9 @@ package org.example.company.tcs.techcellshop.messaging;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.transaction.Transactional;
 import org.example.company.tcs.techcellshop.domain.OutboxEvent;
 import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
@@ -30,12 +33,22 @@ public class OutboxPublisherJob {
     private final String exchange;
     private final String routingKey;
 
-    public OutboxPublisherJob(OutboxEventRepository outboxEventRepository, RabbitTemplate rabbitTemplate, ObjectMapper objectMapper, @Value("${app.messaging.order-created.exchange}") String exchange, @Value("${app.messaging.order-created.routing-key}") String routingKey) {
+    private final Counter publishSuccessCounter;
+    private final Counter publishFailureCounter;
+    private final Counter publishPermanentFailureCounter;
+    private final Timer publishTimer;
+
+    public OutboxPublisherJob(OutboxEventRepository outboxEventRepository, RabbitTemplate rabbitTemplate, ObjectMapper objectMapper, @Value("${app.messaging.order-created.exchange}") String exchange, @Value("${app.messaging.order-created.routing-key}") String routingKey, MeterRegistry meterRegistry,) {
         this.outboxEventRepository = outboxEventRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.objectMapper = objectMapper;
         this.exchange = exchange;
         this.routingKey = routingKey;
+
+        this.publishSuccessCounter = meterRegistry.counter("techcellshop.outbox.publish.success");
+        this.publishFailureCounter = meterRegistry.counter("techcellshop.outbox.publish.failure");
+        this.publishPermanentFailureCounter = meterRegistry.counter("techcellshop.outbox.publish.failed_permanently");
+        this.publishTimer = meterRegistry.timer("techcellshop.outbox.publish.duration");
     }
 
     @Scheduled(fixedDelayString = "${app.messaging.outbox-publisher-interval-ms:5000}")
@@ -56,38 +69,47 @@ public class OutboxPublisherJob {
     }
 
     private void processEvent(OutboxEvent event) {
-        try{
-            OrderCreatedDomainEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedDomainEvent.class);
-            rabbitTemplate.convertAndSend(exchange, routingKey, payload);
+        publishTimer.record(() -> {
+            try{
+                OrderCreatedDomainEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedDomainEvent.class);
+                rabbitTemplate.convertAndSend(exchange, routingKey, payload);
 
-            event.setStatus(OutboxEventStatus.SENT);
-            event.setSentAt(Instant.now());
-            event.setLastError(null);
+                event.setStatus(OutboxEventStatus.SENT);
+                event.setSentAt(Instant.now());
+                event.setLastError(null);
 
-            outboxEventRepository.save(event);
+                outboxEventRepository.save(event);
+                publishSuccessCounter.increment();
 
-            log.info("Outbox: Successfully published event id={} type={}", event.getId(), event.getEventType());
-        }catch (JsonMappingException jsonMappingException){
-            event.setAttempts(MAX_ATTEMPTS);
-            event.setStatus(OutboxEventStatus.FAILED);
-            event.setLastError("Failed to deserialize payload: " + jsonMappingException.getMessage());
-            outboxEventRepository.save(event);
-            log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED ", jsonMappingException.getMessage(), event.getId());
-        }catch (Exception ex){
-            int newAttempt = event.getAttempts() + 1;
-            event.setAttempts(newAttempt);
-            event.setLastError(ex.getMessage());
-
-            if (newAttempt >= MAX_ATTEMPTS){
+                log.info("Outbox: Successfully published event id={} type={}", event.getId(), event.getEventType());
+            }catch (JsonMappingException jsonMappingException){
+                event.setAttempts(MAX_ATTEMPTS);
                 event.setStatus(OutboxEventStatus.FAILED);
-                log.error("Outbox: Failed to publish event id={} type={}", event.getId(), event.getEventType());
-            }else {
-                long backoffSeconds = (long) (Math.pow(2, newAttempt) * 5L);
-                event.setNextAttemptAt(Instant.now().plusSeconds(backoffSeconds));
-                log.warn("Outbox: Failed to publish event id={}, will retry at {}, attempt {}/{}", event.getId(), event.getNextAttemptAt(), newAttempt, MAX_ATTEMPTS);
+                event.setLastError("Failed to deserialize payload: " + jsonMappingException.getMessage());
+
+                outboxEventRepository.save(event);
+                publishFailureCounter.increment();
+                publishPermanentFailureCounter.increment();
+                log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED ", jsonMappingException.getMessage(), event.getId());
+            }catch (Exception ex){
+                int newAttempt = event.getAttempts() + 1;
+                event.setAttempts(newAttempt);
+                event.setLastError(ex.getMessage());
+
+                publishFailureCounter.increment();
+
+                if (newAttempt >= MAX_ATTEMPTS){
+                    event.setStatus(OutboxEventStatus.FAILED);
+                    publishPermanentFailureCounter.increment();
+                    log.error("Outbox: Failed to publish event id={} type={}", event.getId(), event.getEventType());
+                }else {
+                    long backoffSeconds = (long) (Math.pow(2, newAttempt) * 5L);
+                    event.setNextAttemptAt(Instant.now().plusSeconds(backoffSeconds));
+                    log.warn("Outbox: Failed to publish event id={}, will retry at {}, attempt {}/{}", event.getId(), event.getNextAttemptAt(), newAttempt, MAX_ATTEMPTS);
+                }
+                outboxEventRepository.save(event);
             }
-            outboxEventRepository.save(event);
-        }
+        })
     }
 
 }

@@ -1,5 +1,8 @@
 package org.example.company.tcs.techcellshop.messaging;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.example.company.tcs.techcellshop.domain.ProcessedEvent;
 import org.example.company.tcs.techcellshop.repository.ProcessedEventRepository;
 import org.slf4j.Logger;
@@ -16,24 +19,36 @@ public class OrderCreatedListener {
     private static final Logger log = LoggerFactory.getLogger(OrderCreatedListener.class);
     private final ProcessedEventRepository processedEventRepository;
 
-    public OrderCreatedListener(ProcessedEventRepository processedEventRepository) {
+    private final Counter processedCounter;
+    private final Counter duplicateCounter;
+    private final Timer processingTimer;
+
+    public OrderCreatedListener(ProcessedEventRepository processedEventRepository, MeterRegistry meterRegistry) {
         this.processedEventRepository = processedEventRepository;
+        this.processedCounter = meterRegistry.counter("techcellshop.rabbit.order_created.processed");
+        this.duplicateCounter = meterRegistry.counter("techcellshop.rabbit.order_created.duplicate");
+        this.processingTimer = meterRegistry.timer("techcellshop.rabbit.order_created.duration");
     }
 
     @Transactional
     @RabbitListener(queues = "${app.messaging.order-created.queue}")
     public void handle(OrderCreatedEvent event) {
-        if (processedEventRepository.existsByEventId(event.eventId())) {
-            log.info("Duplicate event received with eventId={}, ignoring", event.eventId());
-            return;
-        }
+        processingTimer.record(() -> {
+            if (processedEventRepository.existsByEventId(event.eventId())) {
+                duplicateCounter.increment();
+                log.info("Duplicate event received with eventId={}, ignoring", event.eventId());
+                return;
+            }
 
-        log.info("Received order.created event for orderId={} userId={}", event.orderId(), event.userId());
+            log.info("Received order.created event for orderId={} userId={}", event.orderId(), event.userId());
 
-        ProcessedEvent processedEvent = new ProcessedEvent();
-        processedEvent.setEventId(event.eventId());
-        processedEvent.setEventType("order.created");
-        processedEvent.setProcessedAt(Instant.now());
-        processedEventRepository.save(processedEvent);
+            ProcessedEvent processedEvent = new ProcessedEvent();
+            processedEvent.setEventId(event.eventId());
+            processedEvent.setEventType("order.created");
+            processedEvent.setProcessedAt(Instant.now());
+            processedEventRepository.save(processedEvent);
+
+            processedCounter.increment();
+        });
     }
 }
