@@ -28,6 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -109,7 +110,11 @@ class OrderControllerTest {
                 "2026-04-01",
                 "2026-04-06",
                 "CREDIT_CARD",
-                PaymentStatus.PENDING
+                PaymentStatus.PENDING,
+                "WELCOME10",
+                BigDecimal.valueOf(0.10),
+                BigDecimal.valueOf(10),
+                "User wants to pay with another card"
         );
     }
 
@@ -228,7 +233,11 @@ class OrderControllerTest {
                     "2026-04-01",
                     "2026-04-10",
                     "CREDIT_CARD",
-                    PaymentStatus.CONFIRMED
+                    PaymentStatus.CONFIRMED,
+                    "WELCOME10",
+                    BigDecimal.valueOf(0.10),
+                    BigDecimal.valueOf(10),
+                    "User wants to pay with another card"
             );
 
             when(orderService.updateOrder(eq(1L), any(OrderUpdateRequest.class))).thenReturn(mockOrder);
@@ -321,7 +330,11 @@ class OrderControllerTest {
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
-                    PaymentStatus.CONFIRMED
+                    PaymentStatus.CONFIRMED,
+                    "WELCOME10",
+                    BigDecimal.valueOf(0.10),
+                    BigDecimal.valueOf(10),
+                    "User wants to pay with another card"
             );
 
             when(orderService.updateStatus(eq(1L), eq(OrderStatus.SHIPPED), eq("Sent to carrier")))
@@ -367,7 +380,11 @@ class OrderControllerTest {
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
-                    PaymentStatus.FAILED
+                    PaymentStatus.FAILED,
+                    "WELCOME10",
+                    BigDecimal.valueOf(0.10),
+                    BigDecimal.valueOf(10),
+                    "User wants to pay with another card"
             );
 
             when(orderService.cancelOrder(1L, "Customer request")).thenReturn(canceledResponse);
@@ -397,7 +414,11 @@ class OrderControllerTest {
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
-                    PaymentStatus.PENDING
+                    PaymentStatus.PENDING,
+                    "WELCOME10",
+                    BigDecimal.valueOf(0.10),
+                    BigDecimal.valueOf(10),
+                    "User wants to pay with another card"
             );
 
             when(orderService.applyCoupon(1L, "WELCOME10")).thenReturn(discounted);

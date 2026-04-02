@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.messaging;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -23,6 +24,7 @@ public class OrderMessagingPublisher {
         this.routingKey = routingKey;
     }
 
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void orderCreated(OrderCreatedDomainEvent orderCreatedDomainEvent){
         Order order = orderCreatedDomainEvent.order();

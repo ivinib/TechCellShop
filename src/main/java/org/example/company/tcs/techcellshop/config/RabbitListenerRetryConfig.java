@@ -26,6 +26,8 @@ public class RabbitListenerRetryConfig {
 
         factory.setAdviceChain(retryAdvice);
         factory.setDefaultRequeueRejected(false);
+        factory.setConcurrentConsumers(2);
+        factory.setMaxConcurrentConsumers(5);
         return factory;
     }
 

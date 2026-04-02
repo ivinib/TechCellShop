@@ -25,6 +25,10 @@ import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -109,6 +113,11 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order with id {} deleted successfully", id);
     }
 
+    @Retryable(
+            retryFor = ObjectOptimisticLockingFailureException.class,
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100, multiplier = 2.0)
+    )
     @Transactional
     @Override
     public Order placeOrder(OrderEnrollmentRequest request) {

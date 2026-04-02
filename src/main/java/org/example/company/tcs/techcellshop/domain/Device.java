@@ -43,4 +43,8 @@ public class Device {
     @Column(name = "device_condition")
     private String deviceCondition;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
 }
