@@ -53,7 +53,7 @@ public class OrderController {
     })
     @PostMapping
     public ResponseEntity<OrderResponse> saveOrder(
-            @RequestHeader("Idempondency-Key") @NotBlank String idempotencyKey,
+            @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
             @Valid
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Order enrollment payload",
