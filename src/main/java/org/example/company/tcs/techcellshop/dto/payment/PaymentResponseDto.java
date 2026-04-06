@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.payment;
+package org.example.company.tcs.techcellshop.dto.payment;
 
 import lombok.Data;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;

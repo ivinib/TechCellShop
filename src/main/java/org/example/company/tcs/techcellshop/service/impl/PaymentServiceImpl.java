@@ -1,8 +1,8 @@
 package org.example.company.tcs.techcellshop.service.impl;
 
 import jakarta.transaction.Transactional;
-import org.example.company.tcs.techcellshop.controller.dto.payment.PaymentActionRequestDto;
-import org.example.company.tcs.techcellshop.controller.dto.payment.PaymentResponseDto;
+import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
+import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;

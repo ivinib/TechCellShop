@@ -1,9 +1,9 @@
 package org.example.company.tcs.techcellshop.mapper;
 
-import org.example.company.tcs.techcellshop.controller.dto.response.*;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
+import org.example.company.tcs.techcellshop.dto.response.*;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

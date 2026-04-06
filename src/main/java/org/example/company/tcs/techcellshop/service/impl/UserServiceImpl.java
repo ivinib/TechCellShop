@@ -1,6 +1,6 @@
 package org.example.company.tcs.techcellshop.service.impl;
 
-import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;

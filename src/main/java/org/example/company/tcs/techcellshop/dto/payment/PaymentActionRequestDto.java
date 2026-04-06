@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.coupon;
+package org.example.company.tcs.techcellshop.dto.payment;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -8,12 +8,14 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class CouponValidationRequestDto {
+public class PaymentActionRequestDto {
 
     @NotBlank
-    private String code;
+    private String transactionId;
 
     @NotNull
     @DecimalMin(value = "0.01")
-    private BigDecimal orderAmount;
+    private BigDecimal amount;
+
+    private String reason;
 }

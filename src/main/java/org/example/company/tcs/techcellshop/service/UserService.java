@@ -1,8 +1,7 @@
 package org.example.company.tcs.techcellshop.service;
 
-import org.example.company.tcs.techcellshop.controller.dto.request.UserUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.User;
-import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 

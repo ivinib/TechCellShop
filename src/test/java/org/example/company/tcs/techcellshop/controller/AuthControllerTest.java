@@ -2,7 +2,7 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
-import org.example.company.tcs.techcellshop.controller.dto.request.AuthRequest;
+import org.example.company.tcs.techcellshop.dto.request.AuthRequest;
 import org.example.company.tcs.techcellshop.service.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

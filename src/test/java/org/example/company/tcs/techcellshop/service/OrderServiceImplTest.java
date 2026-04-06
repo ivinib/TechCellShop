@@ -1,8 +1,8 @@
 package org.example.company.tcs.techcellshop.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.*;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;

@@ -1,6 +1,6 @@
 package org.example.company.tcs.techcellshop.service;
 
-import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;

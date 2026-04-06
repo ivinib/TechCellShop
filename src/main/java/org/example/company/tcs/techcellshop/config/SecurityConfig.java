@@ -81,6 +81,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/devices/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/devices/**").hasRole("ADMIN")
 
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").hasAnyRole("USER", "CUSTOMER", "ADMIN")
                         .requestMatchers("/api/v1/payments/**").hasRole("ADMIN")

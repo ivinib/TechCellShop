@@ -114,3 +114,19 @@ This project enforces automated quality checks on every PR:
     - Branch: 55%
 
 PRs fail if tests fail or coverage drops below thresholds.
+
+## Outbox Event Recovery
+
+The application uses the **outbox pattern** for reliable event publication. Failed events can be recovered through admin endpoints.
+
+### Event lifecycle
+- `PENDING`: ready for publication
+- `SENT`: published successfully
+- `FAILED`: permanently failed after 5 retry attempts
+
+### Admin operations
+Admin users can manage failed outbox events:
+
+**List failed events:**
+```bash
+GET /api/v1/admin/outbox/failed?page=0&size=20

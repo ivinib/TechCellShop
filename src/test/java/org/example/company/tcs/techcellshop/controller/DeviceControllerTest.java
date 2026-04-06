@@ -2,9 +2,9 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
-import org.example.company.tcs.techcellshop.controller.dto.request.DeviceEnrollmentRequest;
-import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
-import org.example.company.tcs.techcellshop.controller.dto.response.DeviceResponse;
+import org.example.company.tcs.techcellshop.dto.request.DeviceEnrollmentRequest;
+import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.response.DeviceResponse;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;

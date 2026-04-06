@@ -2,12 +2,12 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
-import org.example.company.tcs.techcellshop.controller.dto.order.OrderStatusUpdateRequestDto;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
-import org.example.company.tcs.techcellshop.controller.dto.response.DeviceSummaryResponse;
-import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
-import org.example.company.tcs.techcellshop.controller.dto.response.UserSummaryResponse;
+import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
+import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.response.DeviceSummaryResponse;
+import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.dto.response.UserSummaryResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;

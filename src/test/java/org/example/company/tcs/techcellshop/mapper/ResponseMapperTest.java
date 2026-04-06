@@ -1,9 +1,11 @@
 package org.example.company.tcs.techcellshop.mapper;
 
-import org.example.company.tcs.techcellshop.controller.dto.response.*;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
+import org.example.company.tcs.techcellshop.dto.response.DeviceResponse;
+import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.dto.response.UserResponse;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,6 +1,6 @@
 package org.example.company.tcs.techcellshop.service;
 
-import org.example.company.tcs.techcellshop.controller.dto.coupon.CouponValidationResponseDto;
+import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 
 import java.math.BigDecimal;
 

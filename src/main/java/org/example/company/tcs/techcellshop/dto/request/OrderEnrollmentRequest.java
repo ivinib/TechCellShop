@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.request;
+package org.example.company.tcs.techcellshop.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;

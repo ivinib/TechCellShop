@@ -2,7 +2,7 @@ package org.example.company.tcs.techcellshop.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;

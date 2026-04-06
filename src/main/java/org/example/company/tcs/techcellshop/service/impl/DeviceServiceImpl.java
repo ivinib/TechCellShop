@@ -1,7 +1,7 @@
 package org.example.company.tcs.techcellshop.service.impl;
 
 import jakarta.transaction.Transactional;
-import org.example.company.tcs.techcellshop.controller.dto.request.DeviceUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;

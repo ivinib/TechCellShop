@@ -6,7 +6,7 @@ import io.micrometer.core.instrument.Timer;
 import org.example.company.tcs.techcellshop.domain.Coupon;
 import org.example.company.tcs.techcellshop.util.DiscountType;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.company.tcs.techcellshop.controller.dto.coupon.CouponValidationResponseDto;
+import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 import org.example.company.tcs.techcellshop.exception.CouponValidationException;
 import org.example.company.tcs.techcellshop.repository.CouponRepository;
 import org.example.company.tcs.techcellshop.service.CouponService;

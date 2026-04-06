@@ -2,8 +2,8 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
-import org.example.company.tcs.techcellshop.controller.dto.coupon.CouponValidationRequestDto;
-import org.example.company.tcs.techcellshop.controller.dto.coupon.CouponValidationResponseDto;
+import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationRequestDto;
+import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 import org.example.company.tcs.techcellshop.service.CouponService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

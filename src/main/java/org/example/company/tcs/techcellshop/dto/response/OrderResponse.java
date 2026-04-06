@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.response;
+package org.example.company.tcs.techcellshop.dto.response;
 
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;

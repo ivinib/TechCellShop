@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.coupon;
+package org.example.company.tcs.techcellshop.dto.coupon;
 
 import lombok.Data;
 

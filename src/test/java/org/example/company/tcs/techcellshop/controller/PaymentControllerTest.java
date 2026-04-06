@@ -2,8 +2,8 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
-import org.example.company.tcs.techcellshop.controller.dto.payment.PaymentActionRequestDto;
-import org.example.company.tcs.techcellshop.controller.dto.payment.PaymentResponseDto;
+import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
+import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
 import org.example.company.tcs.techcellshop.service.PaymentService;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -146,10 +146,7 @@ class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isForbidden())
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty());
     }

@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.controller.dto.request;
+package org.example.company.tcs.techcellshop.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class UserEnrollmentRequest {
+public class UserUpdateRequest {
 
     @Schema(example = "Vinicius", description = "Name of the user")
     @NotBlank(message = "Name is required")
@@ -20,12 +20,6 @@ public class UserEnrollmentRequest {
     @Email(message = "Email must be valid")
     private String emailUser;
 
-    @Schema(example = "password123", description = "Password for the user account")
-    @NotBlank(message = "Password is required")
-    @Size(min = 6, max = 20, message = "Password must have between 6 and 20 characters")
-    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$", message = "Password must contain at least one letter and one number")
-    private String passwordUser;
-
     @Schema(example = "(45) 99034-4234", description = "Phone number of the user, can include country code and special characters")
     @NotBlank(message = "Phone is required")
     @Pattern(
@@ -34,7 +28,7 @@ public class UserEnrollmentRequest {
     )
     private String phoneUser;
 
-    @Schema(example = "Paulista Avenue, 235, Sao Paulo", description = "Address of the user, can include street, number, city")
+    @Schema(example = "Paulista Avenue, 235, Sao Paulo", description = "Address of the user, can include street, number, city, etc.")
     @NotBlank(message = "Address is required")
     @Size(min = 5, max = 255, message = "Address must have between 5 and 255 characters")
     private String addressUser;

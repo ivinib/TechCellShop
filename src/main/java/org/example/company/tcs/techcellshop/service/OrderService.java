@@ -1,8 +1,8 @@
 package org.example.company.tcs.techcellshop.service;
 
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderEnrollmentRequest;
-import org.example.company.tcs.techcellshop.controller.dto.request.OrderUpdateRequest;
-import org.example.company.tcs.techcellshop.controller.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 

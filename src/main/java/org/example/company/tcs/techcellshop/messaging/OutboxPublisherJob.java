@@ -71,7 +71,7 @@ public class OutboxPublisherJob {
     private void processEvent(OutboxEvent event) {
         publishTimer.record(() -> {
             try{
-                OrderCreatedDomainEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedDomainEvent.class);
+                OrderCreatedEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedEvent.class);
                 rabbitTemplate.convertAndSend(exchange, routingKey, payload);
 
                 event.setStatus(OutboxEventStatus.SENT);
