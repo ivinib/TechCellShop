@@ -15,12 +15,14 @@ import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
@@ -89,9 +91,10 @@ public class UserController {
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
-        return ResponseEntity.ok(responseMapper.toUserResponseList(users));
+    public ResponseEntity<Page<UserResponse>> getAllUsers(@PageableDefault(size = 20, sort = "idUser") Pageable pageable) {
+        Page<User> users = userService.getAllUsers(pageable);
+        Page<UserResponse> response = users.map(responseMapper::toUserResponse);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(

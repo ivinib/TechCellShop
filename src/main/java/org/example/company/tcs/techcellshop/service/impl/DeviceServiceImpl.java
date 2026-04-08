@@ -10,9 +10,10 @@ import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
@@ -42,9 +43,9 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public List<Device> getAllDevices() {
-        List<Device> devices = deviceRepository.findAll();
-        log.info("Retrieved {} devices from the database", devices.size());
+    public Page<Device> getAllDevices(Pageable pageable) {
+        Page<Device> devices = deviceRepository.findAll(pageable);
+        log.info("Returning devices page {} with {} element(s)", devices.getNumber(), devices.getNumberOfElements());
         return devices;
     }
 

@@ -15,12 +15,14 @@ import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.DeviceService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
@@ -95,9 +97,10 @@ public class DeviceController {
     )
     @ApiResponse(responseCode = "200", description = "Devices returned")
     @GetMapping
-    public ResponseEntity<List<DeviceResponse>> getAllDevices() {
-        List<Device> devices = deviceService.getAllDevices();
-        return ResponseEntity.ok(responseMapper.toDeviceResponseList(devices));
+    public ResponseEntity<Page<DeviceResponse>> getAllDevices(@PageableDefault(size = 20, sort = "idDevice") Pageable pageable) {
+        Page<Device> devices = deviceService.getAllDevices(pageable);
+        Page<DeviceResponse> response = devices.map(responseMapper::toDeviceResponse);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(

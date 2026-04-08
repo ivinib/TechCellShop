@@ -21,6 +21,8 @@ import org.example.company.tcs.techcellshop.util.OutboxEventStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -39,7 +41,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -103,9 +104,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<Order> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        log.info("Returning all orders. Total found: {}", orders.size());
+    public Page<Order> getAllOrders(Pageable pageable) {
+        Page<Order> orders = orderRepository.findAll(pageable);
+        log.info("Returning orders page {} with {} element(s)", orders.getNumber(), orders.getNumberOfElements());
         return orders;
     }
 

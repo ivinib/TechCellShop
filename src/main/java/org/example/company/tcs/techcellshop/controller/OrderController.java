@@ -16,12 +16,14 @@ import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.OrderService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
@@ -87,9 +89,10 @@ public class OrderController {
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        List<Order> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(responseMapper.toOrderResponseList(orders));
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(@PageableDefault(size = 20, sort = "idOrder") Pageable pageable) {
+        Page<Order> orders = orderService.getAllOrders(pageable);
+        Page<OrderResponse> response = orders.map(responseMapper::toOrderResponse);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(

@@ -27,6 +27,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -189,13 +193,20 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("Should return 200 with order list")
         void shouldReturn200_withOrderList() throws Exception {
-            when(orderService.getAllOrders()).thenReturn(List.of(mockOrder));
-            when(responseMapper.toOrderResponseList(any())).thenReturn(List.of(mockOrderResponse));
+            Page<Order> ordersPage = new PageImpl<>(List.of(mockOrder), PageRequest.of(0, 20), 1);
 
-            mockMvc.perform(get("/api/v1/orders"))
+            when(orderService.getAllOrders(any(Pageable.class))).thenReturn(ordersPage);
+            when(responseMapper.toOrderResponse(mockOrder)).thenReturn(mockOrderResponse);
+
+            mockMvc.perform(get("/api/v1/orders")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].idOrder").value(1L));
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].idOrder").value(1L))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.number").value(0))
+                    .andExpect(jsonPath("$.size").value(20));
         }
 
         @Test

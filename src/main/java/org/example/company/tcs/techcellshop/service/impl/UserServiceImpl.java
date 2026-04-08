@@ -8,10 +8,10 @@ import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -54,9 +54,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> getAllUsers() {
-        List<User> users = userRepository.findAll();
-        log.info("Returning all users. Total found: {}", users.size());
+    public Page<User> getAllUsers(Pageable pageable) {
+        Page<User> users = userRepository.findAll(pageable);
+        log.info("Returning users page {} with number of registers {}", users.getNumber(), users.getTotalElements());
         return users;
     }
 

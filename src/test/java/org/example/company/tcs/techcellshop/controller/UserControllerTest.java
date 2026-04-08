@@ -22,6 +22,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -148,25 +152,33 @@ class UserControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 with user list when authenticated")
         void shouldReturn200_withUserList_whenAuthenticated() throws Exception {
-            when(userService.getAllUsers()).thenReturn(List.of(mockUser));
-            when(responseMapper.toUserResponseList(any())).thenReturn(List.of(mockUserResponse));
+            Page<User> usersPage = new PageImpl<>(List.of(mockUser), PageRequest.of(0, 20), 1);
 
-            mockMvc.perform(get("/api/v1/users"))
+            when(userService.getAllUsers(any(Pageable.class))).thenReturn(usersPage);
+            when(responseMapper.toUserResponse(mockUser)).thenReturn(mockUserResponse);
+
+            mockMvc.perform(get("/api/v1/users")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].nameUser").value("Ana Silva"));
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].nameUser").value("Ana Silva"))
+                    .andExpect(jsonPath("$.totalElements").value(1));
         }
 
         @Test
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 with empty list when no users exist")
         void shouldReturn200_withEmptyList_whenNoUsersExist() throws Exception {
-            when(userService.getAllUsers()).thenReturn(List.of());
-            when(responseMapper.toUserResponseList(any())).thenReturn(List.of());
+            Page<User> usersPage = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
 
-            mockMvc.perform(get("/api/v1/users"))
+            when(userService.getAllUsers(any(Pageable.class))).thenReturn(usersPage);
+
+            mockMvc.perform(get("/api/v1/users")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(0));
+                    .andExpect(jsonPath("$.content.length()").value(0));
         }
 
         @Test

@@ -22,6 +22,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -204,25 +208,33 @@ class DeviceControllerTest {
         @WithMockUser
         @DisplayName("Should return 200 with device list when authenticated")
         void shouldReturn200_withDeviceList_whenAuthenticated() throws Exception {
-            when(deviceService.getAllDevices()).thenReturn(List.of(mockDevice));
-            when(responseMapper.toDeviceResponseList(any())).thenReturn(List.of(mockDeviceResponse));
+            Page<Device> devicesPage = new PageImpl<>(List.of(mockDevice), PageRequest.of(0, 20), 1);
 
-            mockMvc.perform(get("/api/v1/devices"))
+            when(deviceService.getAllDevices(any(Pageable.class))).thenReturn(devicesPage);
+            when(responseMapper.toDeviceResponse(mockDevice)).thenReturn(mockDeviceResponse);
+
+            mockMvc.perform(get("/api/v1/devices")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].nameDevice").value("Galaxy S24"));
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].nameDevice").value("Galaxy S24"))
+                    .andExpect(jsonPath("$.totalElements").value(1));
         }
 
         @Test
         @WithMockUser
         @DisplayName("Should return 200 with empty list when no devices exist")
         void shouldReturn200_withEmptyList_whenNoDevicesExist() throws Exception {
-            when(deviceService.getAllDevices()).thenReturn(List.of());
-            when(responseMapper.toDeviceResponseList(any())).thenReturn(List.of());
+            Page<Device> devicesPage = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
 
-            mockMvc.perform(get("/api/v1/devices"))
+            when(deviceService.getAllDevices(any(Pageable.class))).thenReturn(devicesPage);
+
+            mockMvc.perform(get("/api/v1/devices")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(0));
+                    .andExpect(jsonPath("$.content.length()").value(0));
         }
 
         @Test
