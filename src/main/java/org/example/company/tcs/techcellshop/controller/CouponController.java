@@ -56,7 +56,7 @@ public class CouponController {
                     description = "Unauthorized",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
                     )
             ),
             @ApiResponse(

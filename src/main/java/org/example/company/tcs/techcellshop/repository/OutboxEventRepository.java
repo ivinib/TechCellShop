@@ -24,6 +24,11 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
 
     Optional<OutboxEvent> findByEventId(String eventId);
 
+    long countByStatus(OutboxEventStatus status);
+
+    @Query("SELECT MIN(e.createdAt) FROM OutboxEvent e WHERE e.status = :status")
+    Optional<Instant> findOldestCreatedAtByStatus(@Param("status") OutboxEventStatus status);
+
     @Modifying
     @Query("""
        update OutboxEvent e

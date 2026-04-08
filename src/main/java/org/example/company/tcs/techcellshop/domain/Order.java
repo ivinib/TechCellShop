@@ -34,6 +34,10 @@ public class Order {
     @Column(name = "total_price_order")
     private Double totalPriceOrder;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status_order", nullable = false, length = 20)
     private OrderStatus status;

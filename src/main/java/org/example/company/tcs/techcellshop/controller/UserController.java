@@ -24,7 +24,7 @@ import java.util.List;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
-@Tag(name = "Users managment", description = "User management endpoints")
+@Tag(name = "User Management", description = "User management endpoints")
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {

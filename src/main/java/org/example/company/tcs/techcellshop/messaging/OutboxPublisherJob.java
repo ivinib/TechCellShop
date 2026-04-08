@@ -51,7 +51,7 @@ public class OutboxPublisherJob {
         this.publishTimer = meterRegistry.timer("techcellshop.outbox.publish.duration");
     }
 
-    @Scheduled(fixedDelayString = "${app.messaging.outbox-publisher-interval-ms:5000}")
+    @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:5000}")
     @Transactional
     public void pollAndPublishOutboxEvents() {
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingBatch(OutboxEventStatus.PENDING, Instant.now(), PageRequest.of(0, BATCH_SIZE));
@@ -71,7 +71,7 @@ public class OutboxPublisherJob {
     private void processEvent(OutboxEvent event) {
         publishTimer.record(() -> {
             try{
-                OrderCreatedEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedEvent.class);
+                OrderCreatedDomainEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedDomainEvent.class);
                 rabbitTemplate.convertAndSend(exchange, routingKey, payload);
 
                 event.setStatus(OutboxEventStatus.SENT);
@@ -90,7 +90,7 @@ public class OutboxPublisherJob {
                 outboxEventRepository.save(event);
                 publishFailureCounter.increment();
                 publishPermanentFailureCounter.increment();
-                log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED ", jsonMappingException.getMessage(), event.getId());
+                log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED", jsonMappingException.getMessage(), event.getId());
             }catch (Exception ex){
                 int newAttempt = event.getAttempts() + 1;
                 event.setAttempts(newAttempt);

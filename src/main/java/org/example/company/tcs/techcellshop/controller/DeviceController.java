@@ -62,13 +62,13 @@ public class DeviceController {
                                             {
                                               "nameDevice": "Galaxy S24",
                                               "descriptionDevice": "Samsung smartphone 256GB",
-                                              "typeDevice": "SMARTPHONE",
-                                              "storageDevice": "256GB",
-                                              "ramDevice": "8GB",
-                                              "colorDevice": "Black",
-                                              "priceDevice": 3999.90,
-                                              "stockDevice": 10,
-                                              "conditionDevice": "NEW"
+                                              "deviceType": "SMARTPHONE",
+                                              "deviceStorage": "256GB",
+                                              "deviceRam": "8GB",
+                                              "deviceColor": "Black",
+                                              "devicePrice": 3999.90,
+                                              "deviceStock": 10,
+                                              "deviceCondition": "NEW"
                                             }
                                             """
                             )
@@ -136,7 +136,7 @@ public class DeviceController {
 
     @Operation(
             summary = "Delete a specific device using its id",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDevice(@PathVariable Long id) {

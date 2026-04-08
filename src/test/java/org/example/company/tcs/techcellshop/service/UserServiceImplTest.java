@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.service;
 import org.example.company.tcs.techcellshop.dto.request.UserUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,9 @@ class UserServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private RequestMapper requestMapper;
 
     @InjectMocks
     private UserServiceImpl userService;

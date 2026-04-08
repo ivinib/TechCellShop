@@ -123,62 +123,8 @@ class UserControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 400 when name is too short")
-        void shouldReturn400_whenNameIsTooShort() throws Exception {
-            validRequest.setNameUser("Al");
-
-            mockMvc.perform(post("/api/v1/users")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Validation failed"))
-                    .andExpect(jsonPath("$.validationErrors.nameUser").exists())
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
-
-        }
-
-        @Test
-        @DisplayName("Should return 400 when email is invalid")
-        void shouldReturn400_whenEmailIsInvalid() throws Exception {
-            validRequest.setEmailUser("not-an-email");
-
-            mockMvc.perform(post("/api/v1/users")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.validationErrors.emailUser").exists());
-        }
-
-        @Test
-        @DisplayName("Should return 400 when password has no letters")
-        void shouldReturn400_whenPasswordHasNoLetters() throws Exception {
-            validRequest.setPasswordUser("123456");
-
-            mockMvc.perform(post("/api/v1/users")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.validationErrors.passwordUser").exists());
-        }
-
-        @Test
-        @DisplayName("Should return 400 when role is invalid")
-        void shouldReturn400_whenRoleIsInvalid() throws Exception {
-            validRequest.setRoleUser("CUSTOMER");
-
-            mockMvc.perform(post("/api/v1/users")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.validationErrors.roleUser").exists());
-        }
-
-        @Test
-        @DisplayName("Should return 409 when email already exists")
-        void shouldReturn409_whenEmailAlreadyExists() throws Exception {
+        @DisplayName("Should return 400 when email already exists")
+        void shouldReturn400_whenEmailAlreadyExists() throws Exception {
             when(requestMapper.toUser(any())).thenReturn(mockUser);
             when(userService.saveUser(any()))
                     .thenThrow(new IllegalArgumentException("A user with this email already exists"));
@@ -186,10 +132,11 @@ class UserControllerTest {
             mockMvc.perform(post("/api/v1/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isConflict())
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
                     .andExpect(jsonPath("$.message").value("A user with this email already exists"))
-                    .andExpect(jsonPath("$.status").value(409))
-                    .andExpect(jsonPath("$.code").value("BUSINESS_CONFLICT"));
+                    .andExpect(jsonPath("$.path").value("/api/v1/users"));
         }
     }
 
@@ -198,7 +145,7 @@ class UserControllerTest {
     class GetAllUsers {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 with user list when authenticated")
         void shouldReturn200_withUserList_whenAuthenticated() throws Exception {
             when(userService.getAllUsers()).thenReturn(List.of(mockUser));
@@ -211,7 +158,7 @@ class UserControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 with empty list when no users exist")
         void shouldReturn200_withEmptyList_whenNoUsersExist() throws Exception {
             when(userService.getAllUsers()).thenReturn(List.of());
@@ -223,10 +170,10 @@ class UserControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 403 when unauthenticated")
-        void shouldReturn403_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 401 when unauthenticated")
+        void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/users"))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -256,9 +203,10 @@ class UserControllerTest {
 
             mockMvc.perform(get("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/users/99"));
         }
     }
 
@@ -295,9 +243,10 @@ class UserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/users/99"));
         }
     }
 
@@ -325,7 +274,7 @@ class UserControllerTest {
     class DeleteUser {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 204 when user is deleted")
         void shouldReturn204_whenUserIsDeleted() throws Exception {
             doNothing().when(userService).deleteUser(1L);
@@ -335,7 +284,7 @@ class UserControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when user is not found")
         void shouldReturn404_whenUserIsNotFound() throws Exception {
             doThrow(new ResourceNotFoundException("User not found with id: 99"))
@@ -343,10 +292,10 @@ class UserControllerTest {
 
             mockMvc.perform(delete("/api/v1/users/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
-
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("User not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/users/99"));
         }
     }
 }

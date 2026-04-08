@@ -15,7 +15,7 @@ import org.example.company.tcs.techcellshop.service.PaymentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Payment Managment", description = "Endpoints for managing payment actions such as confirmation, failure, and refunds")
+@Tag(name = "Payment Management", description = "Endpoints for managing payment actions such as confirmation, failure, and refunds")
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
@@ -35,6 +35,14 @@ public class PaymentController {
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(ref = "#/components/examples/ValidationErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
                     )
             ),
             @ApiResponse(
@@ -58,7 +66,7 @@ public class PaymentController {
                     description = "Unauthorized",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
                     )
             ),
             @ApiResponse(
@@ -87,6 +95,14 @@ public class PaymentController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "Order not found",
                     content = @Content(
@@ -107,7 +123,7 @@ public class PaymentController {
                     description = "Unauthorized",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
                     )
             ),
             @ApiResponse(
@@ -136,6 +152,14 @@ public class PaymentController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "Order not found",
                     content = @Content(
@@ -156,7 +180,7 @@ public class PaymentController {
                     description = "Unauthorized",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
                     )
             ),
             @ApiResponse(

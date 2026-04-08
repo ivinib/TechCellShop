@@ -2,10 +2,10 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.dto.request.DeviceEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.DeviceResponse;
-import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
@@ -118,7 +118,7 @@ class DeviceControllerTest {
     class SaveDevice {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 201 when request is valid")
         void shouldReturn201_whenRequestIsValid() throws Exception {
             when(requestMapper.toDevice(any())).thenReturn(mockDevice);
@@ -135,7 +135,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when device type is invalid")
         void shouldReturn400_whenDeviceTypeIsInvalid() throws Exception {
             validRequest.setDeviceType("PHONE");
@@ -148,7 +148,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when storage format is invalid")
         void shouldReturn400_whenStorageFormatIsInvalid() throws Exception {
             validRequest.setDeviceStorage("256");
@@ -161,7 +161,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when price is negative")
         void shouldReturn400_whenPriceIsNegative() throws Exception {
             validRequest.setDevicePrice(-1.0);
@@ -174,7 +174,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when condition is invalid")
         void shouldReturn400_whenConditionIsInvalid() throws Exception {
             validRequest.setDeviceCondition("OLD");
@@ -187,12 +187,12 @@ class DeviceControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 403 when unauthenticated")
-        void shouldReturn403_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 401 when unauthenticated")
+        void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -226,10 +226,10 @@ class DeviceControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 403 when unauthenticated")
-        void shouldReturn403_whenUnauthenticated() throws Exception {
+        @DisplayName("Should return 401 when unauthenticated")
+        void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/devices"))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -259,10 +259,10 @@ class DeviceControllerTest {
 
             mockMvc.perform(get("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
         }
     }
 
@@ -271,7 +271,7 @@ class DeviceControllerTest {
     class UpdateDevice {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when device is updated")
         void shouldReturn200_whenDeviceIsUpdated() throws Exception {
             DeviceResponse updatedResponse = new DeviceResponse(
@@ -290,7 +290,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when device is not found")
         void shouldReturn404_whenDeviceIsNotFound() throws Exception {
             when(deviceService.updateDevice(eq(99L), any()))
@@ -300,10 +300,10 @@ class DeviceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
         }
     }
 
@@ -312,7 +312,7 @@ class DeviceControllerTest {
     class PartialUpdateDevice {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when device is partially updated")
         void shouldReturn200_whenDeviceIsPartiallyUpdated() throws Exception {
             when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
@@ -331,7 +331,7 @@ class DeviceControllerTest {
     class DeleteDevice {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 204 when device is deleted")
         void shouldReturn204_whenDeviceIsDeleted() throws Exception {
             doNothing().when(deviceService).deleteDevice(1L);
@@ -341,7 +341,7 @@ class DeviceControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when device is not found")
         void shouldReturn404_whenDeviceIsNotFound() throws Exception {
             doThrow(new ResourceNotFoundException("Device not found with id: 99"))
@@ -349,11 +349,10 @@ class DeviceControllerTest {
 
             mockMvc.perform(delete("/api/v1/devices/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
-
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
         }
     }
 }

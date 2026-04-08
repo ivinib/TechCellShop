@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationRequestDto;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.service.CouponService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -36,6 +38,9 @@ class CouponControllerTest {
 
     @Autowired
     private WebApplicationContext context;
+
+    @Mock
+    private RequestMapper requestMapper;
 
     @MockitoBean
     private CouponService couponService;
@@ -105,6 +110,8 @@ class CouponControllerTest {
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"));
     }
 }

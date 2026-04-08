@@ -78,21 +78,21 @@ class AuthControllerTest {
     @DisplayName("POST /api/v1/auth/login should return 400 when email is invalid")
     void login_shouldReturn400_whenEmailInvalid() throws Exception {
         String payload = """
-                {
-                  "email": "invalid-email",
-                  "password": "password123"
-                }
-                """;
+            {
+              "email": "invalid-email",
+              "password": "password123"
+            }
+            """;
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.validationErrors.email").exists())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.traceId").isNotEmpty());
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.validationErrors.email").exists());
     }
 
     @Test

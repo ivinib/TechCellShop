@@ -170,6 +170,6 @@ class ResponseMapperTest {
         List<OrderResponse> result = responseMapper.toOrderResponseList(List.of(order));
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).statusOrder()).isEqualTo("CREATED");
+        assertThat(result.get(0).statusOrder()).isEqualTo(OrderStatus.CREATED);
     }
 }

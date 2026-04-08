@@ -2,15 +2,15 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.DeviceSummaryResponse;
 import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.dto.response.UserSummaryResponse;
-import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
-import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
@@ -31,6 +31,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -48,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class})
 @DisplayName("OrderController")
 class OrderControllerTest {
 
@@ -60,9 +61,6 @@ class OrderControllerTest {
 
     @MockitoBean
     private OrderService orderService;
-
-    @MockitoBean
-    private RequestMapper requestMapper;
 
     @MockitoBean
     private ResponseMapper responseMapper;
@@ -126,14 +124,15 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("Should return 201 when request is valid")
         void shouldReturn201_whenRequestIsValid() throws Exception {
-            when(orderService.placeOrder(any(OrderEnrollmentRequest.class))).thenReturn(mockOrder);
-            when(responseMapper.toOrderResponse(any(Order.class))).thenReturn(mockOrderResponse);
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("KEY-001"))).thenReturn(mockOrder);
+            when(responseMapper.toOrderResponse(mockOrder)).thenReturn(mockOrderResponse);
 
             mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
                     .andExpect(status().isCreated())
-                    .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/orders/1")))
+                    .andExpect(header().string("Location", containsString("/api/v1/orders/1")))
                     .andExpect(jsonPath("$.idOrder").value(1L))
                     .andExpect(jsonPath("$.statusOrder").value("CREATED"));
         }
@@ -142,26 +141,43 @@ class OrderControllerTest {
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
         @WithMockUser
-        @DisplayName("Should return 400 when payload is invalid")
-        void shouldReturn400_whenPayloadIsInvalid() throws Exception {
-            validEnrollmentRequest.setQuantityOrder(0);
-
+        @DisplayName("Should return 400 when Idempotency-Key is missing")
+        void shouldReturn400_whenIdempotencyKeyIsMissing() throws Exception {
             mockMvc.perform(post("/api/v1/orders")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/orders")) // or /api/v1/orders/1/status
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders"));
+        }
+
+        @Test
+        @WithMockUser
+        @DisplayName("Should return 409 when stock is insufficient")
+        void shouldReturn409_whenStockIsInsufficient() throws Exception {
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("KEY-001")))
+                    .thenThrow(new InsufficientStockException("Insufficient stock for device id 1"));
+
+            mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.status").value(409))
+                    .andExpect(jsonPath("$.error").value("Conflict"))
+                    .andExpect(jsonPath("$.code").value("BUSINESS_CONFLICT"))
+                    .andExpect(jsonPath("$.message").value("Insufficient stock for device id 1"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders"));
         }
     }
 
@@ -186,7 +202,7 @@ class OrderControllerTest {
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/orders"))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -213,13 +229,26 @@ class OrderControllerTest {
             when(orderService.getOrderById(99L))
                     .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
 
-
             mockMvc.perform(get("/api/v1/orders/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
+        }
+
+        @Test
+        @WithMockUser
+        @DisplayName("Should include traceId in error response")
+        void shouldIncludeTraceIdInErrorResponse() throws Exception {
+            when(orderService.getOrderById(99L))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
+
+            mockMvc.perform(get("/api/v1/orders/99")
+                            .header("X-Trace-Id", "trace-test-123"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.traceId").value("trace-test-123"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
         }
     }
 
@@ -270,11 +299,10 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
-            ;
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
         }
     }
 
@@ -320,11 +348,10 @@ class OrderControllerTest {
 
             mockMvc.perform(delete("/api/v1/orders/99"))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
-
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
         }
     }
 
@@ -353,8 +380,12 @@ class OrderControllerTest {
                     "User wants to pay with another card"
             );
 
+            Order shippedOrder = new Order();
+            shippedOrder.setIdOrder(1L);
+
             when(orderService.updateStatus(eq(1L), eq(OrderStatus.SHIPPED), eq("Sent to carrier")))
-                    .thenReturn(shippedResponse);
+                    .thenReturn(shippedOrder);
+            when(responseMapper.toOrderResponse(shippedOrder)).thenReturn(shippedResponse);
 
             mockMvc.perform(patch("/api/v1/orders/1/status")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -374,11 +405,11 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalid)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/orders"))
-                    .andExpect(jsonPath("$.traceId").isNotEmpty());
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.message").value("Validation failed"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/1/status"))
+                    .andExpect(jsonPath("$.validationErrors.newStatus").exists());
         }
     }
 
@@ -407,7 +438,11 @@ class OrderControllerTest {
                     "User wants to pay with another card"
             );
 
-            when(orderService.cancelOrder(1L, "Customer request")).thenReturn(canceledResponse);
+            Order canceledOrder = new Order();
+            canceledOrder.setIdOrder(1L);
+
+            when(orderService.cancelOrder(1L, "Customer request")).thenReturn(canceledOrder);
+            when(responseMapper.toOrderResponse(canceledOrder)).thenReturn(canceledResponse);
 
             mockMvc.perform(post("/api/v1/orders/1/cancel")
                             .param("reason", "Customer request"))
@@ -441,7 +476,11 @@ class OrderControllerTest {
                     "User wants to pay with another card"
             );
 
-            when(orderService.applyCoupon(1L, "WELCOME10")).thenReturn(discounted);
+            Order discountedOrder = new Order();
+            discountedOrder.setIdOrder(1L);
+
+            when(orderService.applyCoupon(1L, "WELCOME10")).thenReturn(discountedOrder);
+            when(responseMapper.toOrderResponse(discountedOrder)).thenReturn(discounted);
 
             mockMvc.perform(post("/api/v1/orders/1/apply-coupon")
                             .param("code", "WELCOME10"))

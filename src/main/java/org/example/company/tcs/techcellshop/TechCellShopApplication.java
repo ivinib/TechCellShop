@@ -1,5 +1,6 @@
 package org.example.company.tcs.techcellshop;
 
+import org.example.company.tcs.techcellshop.config.OutboxProperties;
 import org.example.company.tcs.techcellshop.security.JwtProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, OutboxProperties.class})
 @EnableAsync
 @EnableRetry
 @EnableScheduling

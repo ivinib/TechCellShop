@@ -14,7 +14,6 @@ import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
-import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.springframework.http.ResponseEntity;
@@ -26,18 +25,16 @@ import java.util.List;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
-@Tag(name = "Orders managment", description = "Order management endpoints")
+@Tag(name = "Order Management", description = "Order management endpoints")
 @RestController
 @RequestMapping("/api/v1/orders")
 public class OrderController {
 
     private final OrderService orderService;
-    private final RequestMapper requestMapper;
     private final ResponseMapper responseMapper;
 
-    OrderController(OrderService orderService, RequestMapper requestMapper, ResponseMapper responseMapper) {
+    OrderController(OrderService orderService, ResponseMapper responseMapper) {
         this.orderService = orderService;
-        this.requestMapper = requestMapper;
         this.responseMapper = responseMapper;
     }
 
@@ -66,8 +63,7 @@ public class OrderController {
                                               "idUser": 1,
                                               "idDevice": 1,
                                               "quantityOrder": 1,
-                                              "addressOrder": "Sao Paulo - SP",
-                                              "paymentMethodOrder": "CREDIT_CARD"
+                                              "paymentMethod": "CREDIT_CARD"
                                             }
                                             """
                             )
@@ -75,7 +71,7 @@ public class OrderController {
             )
             @RequestBody OrderEnrollmentRequest request,
             UriComponentsBuilder uriBuilder) {
-        Order savedOrder = orderService.placeOrder(request);
+        Order savedOrder = orderService.placeOrder(request, idempotencyKey);
         OrderResponse response = responseMapper.toOrderResponse(savedOrder);
 
         URI location = uriBuilder
@@ -140,20 +136,24 @@ public class OrderController {
     public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody OrderStatusUpdateRequestDto request) {
-        return ResponseEntity.ok(orderService.updateStatus(id, request.getNewStatus(), request.getReason()));
+        Order updated = orderService.updateStatus(id, request.getNewStatus(), request.getReason());
+        return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
+
     }
 
     @PostMapping("/{id}/cancel")
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable Long id,
             @RequestParam(required = false) String reason) {
-        return ResponseEntity.ok(orderService.cancelOrder(id, reason));
+        Order canceled = orderService.cancelOrder(id, reason);
+        return ResponseEntity.ok(responseMapper.toOrderResponse(canceled));
     }
 
     @PostMapping("/{id}/apply-coupon")
     public ResponseEntity<OrderResponse> applyCoupon(
             @PathVariable Long id,
             @RequestParam @NotBlank String code) {
-        return ResponseEntity.ok(orderService.applyCoupon(id, code));
+        Order updated = orderService.applyCoupon(id, code);
+        return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
     }
 }

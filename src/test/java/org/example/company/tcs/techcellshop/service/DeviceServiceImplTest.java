@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.service;
 import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
+import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.service.impl.DeviceServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,9 @@ class DeviceServiceImplTest {
 
     @Mock
     private DeviceRepository deviceRepository;
+
+    @Mock
+    private RequestMapper requestMapper;
 
     @InjectMocks
     private DeviceServiceImpl deviceService;

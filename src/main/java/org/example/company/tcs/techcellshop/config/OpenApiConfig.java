@@ -12,12 +12,14 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
 @Configuration
 public class OpenApiConfig {
+
     @Bean
     public OpenAPI techCellShopOpenAPI() {
         return new OpenAPI()
@@ -39,7 +41,9 @@ public class OpenApiConfig {
                         .addExamples("InvalidArgumentExample", invalidArgumentExample())
                         .addExamples("NotFoundErrorExample", notFoundErrorExample())
                         .addExamples("BusinessConflictExample", businessConflictExample())
-                        .addExamples("InternalErrorExample", internalErrorExample()))
+                        .addExamples("InternalErrorExample", internalErrorExample())
+                        .addExamples("UnauthorizedErrorExample", unauthorizedErrorExample())
+                        .addExamples("ForbiddenErrorExample", forbiddenErrorExample()))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
     }
 
@@ -71,54 +75,80 @@ public class OpenApiConfig {
     }
 
     private Example invalidArgumentExample() {
-        return new Example().value(Map.of(
-                "timestamp", "2026-04-02T12:00:00",
-                "status", 400,
-                "error", "Bad Request",
-                "code", "INVALID_ARGUMENT",
-                "message", "Payment method is invalid for this order state",
-                "path", "/api/v1/payments/orders/1/confirm",
-                "traceId", "89dcdd37-8e85-4f53-8a9b-b10b723d5316",
-                "validationErrors", null
-        ));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 400);
+        body.put("error", "Bad Request");
+        body.put("code", "INVALID_ARGUMENT");
+        body.put("message", "Payment method is invalid for this order state");
+        body.put("path", "/api/v1/payments/orders/1/confirm");
+        body.put("traceId", "89dcdd37-8e85-4f53-8a9b-b10b723d5316");
+        body.put("validationErrors", null);
+        return new Example().value(body);
     }
 
     private Example notFoundErrorExample() {
-        return new Example().value(Map.of(
-                "timestamp", "2026-04-02T12:00:00",
-                "status", 404,
-                "error", "Not Found",
-                "code", "RESOURCE_NOT_FOUND",
-                "message", "Order not found with id: 99",
-                "path", "/api/v1/orders/99",
-                "traceId", "f13df8ad-40ad-4c47-8bb5-1e4d5d71e18a",
-                "validationErrors", null
-        ));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 404);
+        body.put("error", "Not Found");
+        body.put("code", "RESOURCE_NOT_FOUND");
+        body.put("message", "Order not found with id: 99");
+        body.put("path", "/api/v1/orders/99");
+        body.put("traceId", "f13df8ad-40ad-4c47-8bb5-1e4d5d71e18a");
+        body.put("validationErrors", null);
+        return new Example().value(body);
     }
 
     private Example businessConflictExample() {
-        return new Example().value(Map.of(
-                "timestamp", "2026-04-02T12:00:00",
-                "status", 409,
-                "error", "Conflict",
-                "code", "BUSINESS_CONFLICT",
-                "message", "Coupon has reached maximum usage limit",
-                "path", "/api/v1/orders/1/apply-coupon",
-                "traceId", "9be47dd3-f7a4-4028-b0a5-e6f6e1fc554f",
-                "validationErrors", null
-        ));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 409);
+        body.put("error", "Conflict");
+        body.put("code", "BUSINESS_CONFLICT");
+        body.put("message", "Coupon has reached maximum usage limit");
+        body.put("path", "/api/v1/orders/1/apply-coupon");
+        body.put("traceId", "9be47dd3-f7a4-4028-b0a5-e6f6e1fc554f");
+        body.put("validationErrors", null);
+        return new Example().value(body);
     }
 
     private Example internalErrorExample() {
-        return new Example().value(Map.of(
-                "timestamp", "2026-04-02T12:00:00",
-                "status", 500,
-                "error", "Internal Server Error",
-                "code", "INTERNAL_ERROR",
-                "message", "Unexpected internal error",
-                "path", "/api/v1/orders",
-                "traceId", "9d245db8-0948-44ec-b8f0-bb9207188586",
-                "validationErrors", null
-        ));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 500);
+        body.put("error", "Internal Server Error");
+        body.put("code", "INTERNAL_ERROR");
+        body.put("message", "Unexpected internal error");
+        body.put("path", "/api/v1/orders");
+        body.put("traceId", "9d245db8-0948-44ec-b8f0-bb9207188586");
+        body.put("validationErrors", null);
+        return new Example().value(body);
+    }
+
+    private Example unauthorizedErrorExample() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 401);
+        body.put("error", "Unauthorized");
+        body.put("code", "UNAUTHORIZED");
+        body.put("message", "Authentication is required to access this resource");
+        body.put("path", "/api/v1/payments/orders/1/confirm");
+        body.put("traceId", null);
+        body.put("validationErrors", null);
+        return new Example().value(body);
+    }
+
+    private Example forbiddenErrorExample() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", "2026-04-02T12:00:00");
+        body.put("status", 403);
+        body.put("error", "Forbidden");
+        body.put("code", "FORBIDDEN");
+        body.put("message", "You do not have permission to access this resource");
+        body.put("path", "/api/v1/payments/orders/1/confirm");
+        body.put("traceId", null);
+        body.put("validationErrors", null);
+        return new Example().value(body);
     }
 }

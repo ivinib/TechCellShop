@@ -3,11 +3,9 @@ package org.example.company.tcs.techcellshop.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
-import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.domain.*;
 import org.example.company.tcs.techcellshop.exception.CouponValidationException;
 import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
-import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
@@ -58,7 +56,6 @@ public class OrderServiceImpl implements OrderService {
     private final OutboxEventRepository outboxEventRepository;
     
     private static final String ORDER_NOT_FOUND = "No order found with id: ";
-    private final ResponseMapper responseMapper;
     private final CouponService couponService;
     private final ObjectMapper objectMapper;
 
@@ -69,14 +66,13 @@ public class OrderServiceImpl implements OrderService {
     private final Timer orderPlaceTimer;
     private final Timer couponApplyTimer;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, ResponseMapper responseMapper, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository, ObjectMapper objectMapper, OutboxEventRepository outboxEventRepository, MeterRegistry meterRegistry) {
+    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository, ObjectMapper objectMapper, OutboxEventRepository outboxEventRepository, MeterRegistry meterRegistry) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
         this.deviceRepository = deviceRepository;
         this.deviceService = deviceService;
         this.orderStatusTransitionValidator = orderStatusTransitionValidator;
-        this.responseMapper = responseMapper;
         this.couponService = couponService;
         this.orderIdempondencyRepository = orderIdempondencyRepository;
         this.objectMapper = objectMapper;
@@ -189,7 +185,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public OrderResponse updateStatus(Long orderId, OrderStatus newStatus, String reason){
+    public Order updateStatus(Long orderId, OrderStatus newStatus, String reason){
         if (newStatus.equals(OrderStatus.CANCELED)){
             return cancelOrder(orderId, reason);
         }
@@ -202,17 +198,15 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(newStatus);
-        Order orderUpdated = orderRepository.save(order);
-
-        return responseMapper.toOrderResponse(orderUpdated);
+        return orderRepository.save(order);
     }
 
     @Transactional
     @Override
-    public OrderResponse cancelOrder(Long orderId, String reason){
+    public Order cancelOrder(Long orderId, String reason){
         Order order = getOrderOrThrow(orderId);
         if (order.getStatus().equals(OrderStatus.CANCELED)){
-            return responseMapper.toOrderResponse(order);
+            return order;
         }
 
         if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)){
@@ -223,14 +217,13 @@ public class OrderServiceImpl implements OrderService {
         order.setCanceledReason((reason == null || reason.isBlank()) ? "Order canceled by the user" : reason);
 
         deviceService.releaseStock(order.getDevice().getIdDevice(), order.getQuantityOrder());
-        Order updatedOrder = orderRepository.save(order);
-        return responseMapper.toOrderResponse(updatedOrder);
+        return orderRepository.save(order);
 
     }
 
     @Transactional
     @Override
-    public OrderResponse applyCoupon(Long orderId, String couponCode) {
+    public Order applyCoupon(Long orderId, String couponCode) {
         return couponApplyTimer.record(() -> {
             Order order = getOrderOrThrow(orderId);
 
@@ -238,9 +231,9 @@ public class OrderServiceImpl implements OrderService {
                     || order.getStatus().equals(OrderStatus.DELIVERED)
                     || order.getStatus().equals(OrderStatus.CANCELED)) {
                 throw new CouponValidationException("Coupon cannot be applied for orders that are in shipped, delivered or canceled status");
-            } else if (null != order.getCouponCode() && !order.getCouponCode().isBlank()) {
+            } else if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
                 if (order.getCouponCode().equalsIgnoreCase(couponCode)) {
-                    return responseMapper.toOrderResponse(order);
+                    return order;
                 }
                 throw new CouponValidationException("An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode());
             }
@@ -259,8 +252,7 @@ public class OrderServiceImpl implements OrderService {
 
             Order saved = orderRepository.save(order);
             couponService.registerCouponUsage(couponCode);
-
-            return responseMapper.toOrderResponse(saved);
+            return saved;
         });
     }
 
