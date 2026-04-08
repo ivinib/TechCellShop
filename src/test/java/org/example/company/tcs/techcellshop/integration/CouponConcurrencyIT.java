@@ -12,8 +12,8 @@ import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.util.DiscountType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -58,7 +58,7 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
         device.setDeviceStorage("128GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(1000.0);
+        device.setDevicePrice(money("1000.00"));
         device.setDeviceStock(5);
         device.setDeviceCondition("NEW");
         device = deviceRepository.save(device);
@@ -144,5 +144,9 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
 
         JsonNode json = objectMapper.readTree(response);
         return json.get("idOrder").asLong();
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

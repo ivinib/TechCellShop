@@ -1,6 +1,9 @@
 package org.example.company.tcs.techcellshop.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.domain.*;
@@ -19,9 +22,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,18 +40,44 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplTest {
 
+    @Mock
+    private OrderRepository orderRepository;
 
-    @Mock private OrderRepository orderRepository;
-    @Mock private RequestMapper requestMapper;
-    @Mock private UserRepository userRepository;
-    @Mock private DeviceRepository deviceRepository;
-    @Mock private DeviceService deviceService;
-    @Mock private OrderStatusTransitionValidator orderStatusTransitionValidator;
-    @Mock private ResponseMapper responseMapper;
-    @Mock private CouponService couponService;
-    @Mock private OrderIdempondencyRepository orderIdempondencyRepository;
-    @Mock private OutboxEventRepository outboxEventRepository;
-    @Mock private ObjectMapper objectMapper;
+    @Mock
+    private RequestMapper requestMapper;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private DeviceRepository deviceRepository;
+
+    @Mock
+    private DeviceService deviceService;
+
+    @Mock
+    private OrderStatusTransitionValidator orderStatusTransitionValidator;
+
+    @Mock
+    private CouponService couponService;
+
+    @Mock
+    private OrderIdempondencyRepository orderIdempondencyRepository;
+
+    @Mock
+    private OutboxEventRepository outboxEventRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    @Mock
+    private MeterRegistry meterRegistry;
+
+    @Mock
+    private Counter counter;
+
+    @Mock
+    private Timer timer;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -53,6 +88,11 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
+        when(meterRegistry.timer(anyString())).thenReturn(timer);
+        doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get())
+                .when(timer).record(any(Supplier.class));
+
         user = new User();
         user.setIdUser(1L);
         user.setNameUser("Ana Silva");
@@ -61,7 +101,7 @@ class OrderServiceImplTest {
         device = new Device();
         device.setIdDevice(1L);
         device.setNameDevice("Galaxy S24");
-        device.setDevicePrice(3999.90);
+        device.setDevicePrice(money("3999.90"));
         device.setDeviceStock(10);
 
         order = new Order();
@@ -69,7 +109,7 @@ class OrderServiceImplTest {
         order.setUser(user);
         order.setDevice(device);
         order.setQuantityOrder(2);
-        order.setTotalPriceOrder(7999.80);
+        order.setTotalPriceOrder(money("7999.80"));
         order.setStatus(OrderStatus.CREATED);
         order.setOrderDate("2026-03-24");
         order.setDeliveryDate("2026-03-31");
@@ -89,7 +129,7 @@ class OrderServiceImplTest {
             Order result = orderService.saveOrder(order);
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
-            assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED);   // enum, not String
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.getPaymentMethod()).isEqualTo("CREDIT_CARD");
             verify(orderRepository).save(order);
         }
@@ -128,20 +168,24 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("should return all orders")
         void shouldReturnAllOrders() {
-            when(orderRepository.findAll()).thenReturn(List.of(order));
+            Page<Order> page = new PageImpl<>(List.of(order), PageRequest.of(0, 20), 1);
+            when(orderRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-            List<Order> result = orderService.getAllOrders();
+            Page<Order> result = orderService.getAllOrders(PageRequest.of(0, 20));
 
-            assertThat(result).hasSize(1);
-            assertThat(result.getFirst().getStatus()).isEqualTo(OrderStatus.CREATED); // enum
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).getStatus()).isEqualTo(OrderStatus.CREATED);
         }
 
         @Test
         @DisplayName("should return empty list when no orders exist")
         void shouldReturnEmptyList() {
-            when(orderRepository.findAll()).thenReturn(List.of());
+            when(orderRepository.findAll(any(Pageable.class)))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
 
-            assertThat(orderService.getAllOrders()).isEmpty();
+            Page<Order> result = orderService.getAllOrders(PageRequest.of(0, 20));
+
+            assertThat(result.getContent()).isEmpty();
         }
     }
 
@@ -154,9 +198,9 @@ class OrderServiceImplTest {
         void shouldApplyUpdateAndReturn() {
             OrderUpdateRequest updateRequest = new OrderUpdateRequest();
             updateRequest.setQuantityOrder(3);
-            updateRequest.setStatusOrder(OrderStatus.PAID);    // PAID exists in enum
+            updateRequest.setStatusOrder(OrderStatus.PAID);
             updateRequest.setDeliveryDate("2026-04-07");
-            updateRequest.setPaymentStatus(PaymentStatus.CONFIRMED);  // realistic after update
+            updateRequest.setPaymentStatus(PaymentStatus.CONFIRMED);
 
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
@@ -176,9 +220,9 @@ class OrderServiceImplTest {
             Order result = orderService.updateOrder(1L, updateRequest);
 
             assertThat(result.getQuantityOrder()).isEqualTo(3);
-            assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);          // enum
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
             assertThat(result.getDeliveryDate()).isEqualTo("2026-04-07");
-            assertThat(result.getPaymentStatus()).isEqualTo(PaymentStatus.CONFIRMED); // enum
+            assertThat(result.getPaymentStatus()).isEqualTo(PaymentStatus.CONFIRMED);
 
             verify(requestMapper).updateOrder(order, updateRequest);
             verify(orderRepository).save(order);
@@ -253,10 +297,16 @@ class OrderServiceImplTest {
                     .thenReturn(Optional.empty());
             when(userRepository.findById(1L)).thenReturn(Optional.of(user));
             when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
-            doNothing().when(deviceService).reserveStock(any(), any());
-            when(orderRepository.save(any(Order.class))).thenReturn(order);
+            doNothing().when(deviceService).reserveStock(1L, 1);
 
-            // Stub objectMapper so writeToOutbox() doesn't throw
+            when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+                Order saved = invocation.getArgument(0);
+                if (saved.getIdOrder() == null) {
+                    saved.setIdOrder(1L);
+                }
+                return saved;
+            });
+
             when(objectMapper.writeValueAsString(any())).thenReturn("{\"eventId\":\"test\"}");
             when(outboxEventRepository.save(any(OutboxEvent.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
@@ -266,7 +316,12 @@ class OrderServiceImplTest {
             Order result = orderService.placeOrder(request, "KEY-001");
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
-            verify(outboxEventRepository).save(any(OutboxEvent.class));  // outbox written
+            assertThat(result.getTotalPriceOrder()).isEqualByComparingTo("3999.90");
+            assertThat(result.getDiscountAmount()).isEqualByComparingTo("0");
+            assertThat(result.getFinalAmount()).isEqualByComparingTo("3999.90");
+
+            verify(deviceService).reserveStock(1L, 1);
+            verify(outboxEventRepository).save(any(OutboxEvent.class));
             verify(orderIdempondencyRepository).save(any(OrderIdempondency.class));
         }
 
@@ -321,5 +376,9 @@ class OrderServiceImplTest {
                 throw new IllegalStateException("SHA-256 not available", e);
             }
         }
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

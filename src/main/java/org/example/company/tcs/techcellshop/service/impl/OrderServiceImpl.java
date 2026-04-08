@@ -163,10 +163,10 @@ public class OrderServiceImpl implements OrderService {
             order.setOrderDate(LocalDate.now().toString());
             order.setDeliveryDate(LocalDate.now().plusDays(5).toString());
 
-            double total = device.getDevicePrice() * quantity;
+            BigDecimal total = device.getDevicePrice().multiply(BigDecimal.valueOf(quantity));
             order.setTotalPriceOrder(total);
             order.setDiscountAmount(BigDecimal.ZERO);
-            order.setFinalAmount(BigDecimal.valueOf(total));
+            order.setFinalAmount(total);
 
             Order saved = orderRepository.save(order);
             writeToOutbox(saved);
@@ -239,7 +239,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new CouponValidationException("An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode());
             }
 
-            BigDecimal orderAmount = BigDecimal.valueOf(order.getTotalPriceOrder());
+            BigDecimal orderAmount = order.getTotalPriceOrder();
             BigDecimal discount = couponService.calculateDiscount(couponCode, orderAmount);
             BigDecimal finalAmount = orderAmount.subtract(discount);
 

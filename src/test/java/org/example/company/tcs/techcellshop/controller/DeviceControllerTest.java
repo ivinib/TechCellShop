@@ -17,16 +17,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -84,7 +85,7 @@ class DeviceControllerTest {
         validRequest.setDeviceStorage("256GB");
         validRequest.setDeviceRam("8GB");
         validRequest.setDeviceColor("Black");
-        validRequest.setDevicePrice(3999.90);
+        validRequest.setDevicePrice(money("3999.90"));
         validRequest.setDeviceStock(10);
         validRequest.setDeviceCondition("NEW");
 
@@ -95,7 +96,7 @@ class DeviceControllerTest {
         validUpdateRequest.setDeviceStorage("256GB");
         validUpdateRequest.setDeviceRam("8GB");
         validUpdateRequest.setDeviceColor("Black");
-        validUpdateRequest.setDevicePrice(3999.90);
+        validUpdateRequest.setDevicePrice(money("3999.90"));
         validUpdateRequest.setDeviceStock(10);
         validUpdateRequest.setDeviceCondition("NEW");
 
@@ -107,13 +108,13 @@ class DeviceControllerTest {
         mockDevice.setDeviceStorage("256GB");
         mockDevice.setDeviceRam("8GB");
         mockDevice.setDeviceColor("Black");
-        mockDevice.setDevicePrice(3999.90);
+        mockDevice.setDevicePrice(money("3999.90"));
         mockDevice.setDeviceStock(10);
         mockDevice.setDeviceCondition("NEW");
 
         mockDeviceResponse = new DeviceResponse(
                 1L, "Galaxy S24", "Samsung smartphone 256GB", "SMARTPHONE",
-                "256GB", "8GB", "Black", 3999.90, 10, "NEW"
+                "256GB", "8GB", "Black", money("3999.90"), 10, "NEW"
         );
     }
 
@@ -168,7 +169,7 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when price is negative")
         void shouldReturn400_whenPriceIsNegative() throws Exception {
-            validRequest.setDevicePrice(-1.0);
+            validRequest.setDevicePrice(money("-1.00"));
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -288,7 +289,7 @@ class DeviceControllerTest {
         void shouldReturn200_whenDeviceIsUpdated() throws Exception {
             DeviceResponse updatedResponse = new DeviceResponse(
                     1L, "Galaxy S24 Ultra", "Samsung smartphone 512GB", "SMARTPHONE",
-                    "512GB", "12GB", "Black", 4999.90, 8, "NEW"
+                    "512GB", "12GB", "Black", money("4999.90"), 8, "NEW"
             );
             when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
             when(responseMapper.toDeviceResponse(any())).thenReturn(updatedResponse);
@@ -366,5 +367,9 @@ class DeviceControllerTest {
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
                     .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
         }
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

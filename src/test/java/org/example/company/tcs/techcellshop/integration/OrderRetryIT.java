@@ -1,9 +1,13 @@
 package org.example.company.tcs.techcellshop.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.domain.*;
+import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
-import org.example.company.tcs.techcellshop.repository.*;
+import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.repository.OrderRepository;
+import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +20,12 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -68,7 +75,7 @@ class OrderRetryIT extends AbstractMultiContainerIT {
     @Test
     @WithMockUser
     @DisplayName("Should handle multiple concurrent order updates")
-    void multipleOrderUpdates_concurrently_shouldAllSucceed() throws Exception {
+    void multipleOrderUpdates_concurrently_shouldAllSucceed() {
         User user = createTestUser("concurrent_test@techcellshop.com");
         Device device = createTestDevice();
 
@@ -91,7 +98,7 @@ class OrderRetryIT extends AbstractMultiContainerIT {
     @Test
     @WithMockUser
     @DisplayName("Should retrieve order with version information")
-    void getOrder_shouldIncludeVersionInfo() throws Exception {
+    void getOrder_shouldIncludeVersionInfo() {
         User user = createTestUser("version_test@techcellshop.com");
         Device device = createTestDevice();
 
@@ -99,7 +106,7 @@ class OrderRetryIT extends AbstractMultiContainerIT {
         order.setUser(user);
         order.setDevice(device);
         order.setQuantityOrder(2);
-        order.setTotalPriceOrder(device.getDevicePrice() * 2);
+        order.setTotalPriceOrder(device.getDevicePrice().multiply(BigDecimal.valueOf(2)));
         order.setStatus(OrderStatus.CREATED);
         order.setPaymentMethod("PIX");
         order.setPaymentStatus(PaymentStatus.PENDING);
@@ -109,6 +116,7 @@ class OrderRetryIT extends AbstractMultiContainerIT {
         assertThat(retrieved.getIdOrder()).isEqualTo(order.getIdOrder());
         assertThat(retrieved.getQuantityOrder()).isEqualTo(2);
         assertThat(retrieved.getVersion()).isNotNull();
+        assertThat(retrieved.getTotalPriceOrder()).isEqualByComparingTo("5599.80");
     }
 
     private User createTestUser(String email) {
@@ -130,9 +138,13 @@ class OrderRetryIT extends AbstractMultiContainerIT {
         device.setDeviceStorage("256GB");
         device.setDeviceRam("12GB");
         device.setDeviceColor("Gold");
-        device.setDevicePrice(2799.90);
+        device.setDevicePrice(money("2799.90"));
         device.setDeviceStock(100);
         device.setDeviceCondition("NEW");
         return deviceRepository.save(device);
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

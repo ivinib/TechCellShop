@@ -3,6 +3,7 @@ package org.example.company.tcs.techcellshop.messaging;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public record OrderCreatedEvent(
@@ -11,7 +12,7 @@ public record OrderCreatedEvent(
         Long userId,
         Long deviceId,
         Integer quantity,
-        Double totalPrice,
+        BigDecimal totalPrice,
         String paymentMethod,
         OrderStatus status,
         PaymentStatus paymentStatus,

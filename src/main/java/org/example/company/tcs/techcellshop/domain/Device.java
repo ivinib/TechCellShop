@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.math.BigDecimal;
+
 @Entity(name = "tb_device")
 @Data
 @EqualsAndHashCode
@@ -34,8 +36,8 @@ public class Device {
     @Column(name = "device_color")
     private String deviceColor;
 
-    @Column(name = "device_price")
-    private Double devicePrice;
+    @Column(name = "device_price", precision = 12, scale = 2)
+    private BigDecimal devicePrice;
 
     @Column(name = "device_stock")
     private Integer deviceStock;

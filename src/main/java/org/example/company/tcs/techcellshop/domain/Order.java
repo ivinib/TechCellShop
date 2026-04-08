@@ -31,8 +31,8 @@ public class Order {
     @Column(name = "quantity_order")
     private Integer quantityOrder;
 
-    @Column(name = "total_price_order")
-    private Double totalPriceOrder;
+    @Column(name = "total_price_order", precision = 12, scale = 2)
+    private BigDecimal totalPriceOrder;
 
     @Version
     @Column(name = "version")

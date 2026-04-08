@@ -6,6 +6,8 @@ import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.*;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+
 @Component
 public class RequestMapper {
     public User toUser(UserEnrollmentRequest request) {
@@ -95,7 +97,7 @@ public class RequestMapper {
             String deviceStorage,
             String deviceRam,
             String deviceColor,
-            Double devicePrice,
+            BigDecimal devicePrice,
             Integer deviceStock,
             String deviceCondition
     ) {

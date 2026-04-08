@@ -22,6 +22,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -72,7 +74,7 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
         testDevice.setDeviceStorage("256GB");
         testDevice.setDeviceRam("12GB");
         testDevice.setDeviceColor("Blue");
-        testDevice.setDevicePrice(2999.90);
+        testDevice.setDevicePrice(money("2999.90"));
         testDevice.setDeviceStock(50);
         testDevice.setDeviceCondition("NEW");
         testDevice = deviceRepository.save(testDevice);
@@ -177,5 +179,9 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
                         .param("code", "SAVE10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.couponCode").value("SAVE10"));
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

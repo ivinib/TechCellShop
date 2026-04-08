@@ -1,9 +1,13 @@
 package org.example.company.tcs.techcellshop.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.domain.*;
+import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.domain.OutboxEvent;
+import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
-import org.example.company.tcs.techcellshop.repository.*;
+import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
+import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.util.OutboxEventStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +20,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
@@ -140,9 +145,13 @@ class OutboxEventPublishingIT extends AbstractMultiContainerIT {
         device.setDeviceStorage("256GB");
         device.setDeviceRam("12GB");
         device.setDeviceColor("White");
-        device.setDevicePrice(3299.90);
+        device.setDevicePrice(money("3299.90"));
         device.setDeviceStock(100);
         device.setDeviceCondition("NEW");
         return deviceRepository.save(device);
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

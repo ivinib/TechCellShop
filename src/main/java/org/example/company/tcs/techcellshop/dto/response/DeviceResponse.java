@@ -1,5 +1,7 @@
 package org.example.company.tcs.techcellshop.dto.response;
 
+import java.math.BigDecimal;
+
 public record DeviceResponse (
         Long idDevice,
         String nameDevice,
@@ -8,7 +10,7 @@ public record DeviceResponse (
         String deviceStorage,
         String deviceRam,
         String deviceColor,
-        Double devicePrice,
+        BigDecimal devicePrice,
         Integer deviceStock,
         String deviceCondition
 ){}

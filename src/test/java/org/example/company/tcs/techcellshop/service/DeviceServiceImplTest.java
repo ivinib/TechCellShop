@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,7 +45,7 @@ class DeviceServiceImplTest {
         device.setDeviceStorage("256GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(3999.90);
+        device.setDevicePrice(money("3999.90"));
         device.setDeviceStock(10);
         device.setDeviceCondition("NEW");
     }
@@ -70,8 +71,6 @@ class DeviceServiceImplTest {
         assertThat(result.getNameDevice()).isEqualTo("Galaxy S24");
     }
 
-    // NOTE: getDeviceById throws RuntimeException instead of ResourceNotFoundException.
-    // This is inconsistent with updateDevice/deleteDevice — consider fixing to ResourceNotFoundException.
     @Test
     void getDeviceById_whenDeviceNotFound_shouldThrowRuntimeException() {
         when(deviceRepository.findById(99L)).thenReturn(Optional.empty());
@@ -109,7 +108,7 @@ class DeviceServiceImplTest {
         updateRequest.setDeviceStorage("512GB");
         updateRequest.setDeviceRam("12GB");
         updateRequest.setDeviceColor("Silver");
-        updateRequest.setDevicePrice(4999.90);
+        updateRequest.setDevicePrice(money("4999.90"));
         updateRequest.setDeviceStock(5);
         updateRequest.setDeviceCondition("NEW");
 
@@ -121,7 +120,7 @@ class DeviceServiceImplTest {
         updatedDevice.setDeviceStorage("512GB");
         updatedDevice.setDeviceRam("12GB");
         updatedDevice.setDeviceColor("Silver");
-        updatedDevice.setDevicePrice(4999.90);
+        updatedDevice.setDevicePrice(money("4999.90"));
         updatedDevice.setDeviceStock(5);
         updatedDevice.setDeviceCondition("NEW");
 
@@ -131,7 +130,7 @@ class DeviceServiceImplTest {
         Device result = deviceService.updateDevice(1L, updateRequest);
 
         assertThat(result.getNameDevice()).isEqualTo("Galaxy S24 Ultra");
-        assertThat(result.getDevicePrice()).isEqualTo(4999.90);
+        assertThat(result.getDevicePrice()).isEqualByComparingTo("4999.90");
         assertThat(result.getDeviceStock()).isEqualTo(5);
         assertThat(result.getDeviceStorage()).isEqualTo("512GB");
         verify(deviceRepository).save(any(Device.class));
@@ -146,7 +145,7 @@ class DeviceServiceImplTest {
         updateRequest.setDeviceStorage("512GB");
         updateRequest.setDeviceRam("12GB");
         updateRequest.setDeviceColor("Silver");
-        updateRequest.setDevicePrice(4999.90);
+        updateRequest.setDevicePrice(money("4999.90"));
         updateRequest.setDeviceStock(5);
         updateRequest.setDeviceCondition("NEW");
 
@@ -175,5 +174,9 @@ class DeviceServiceImplTest {
                 .hasMessage("Device not found with id: 99");
 
         verify(deviceRepository, never()).delete(any());
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

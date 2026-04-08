@@ -41,7 +41,9 @@ public class PaymentServiceImpl implements PaymentService {
             return toResponse(order);
         }
 
-        BigDecimal expectedAmount = (null != order.getFinalAmount() ? order.getFinalAmount() : BigDecimal.valueOf(order.getTotalPriceOrder()));
+        BigDecimal expectedAmount = order.getFinalAmount() != null
+                ? order.getFinalAmount()
+                : order.getTotalPriceOrder();
 
         if (request.getAmount().compareTo(expectedAmount) != 0){
             throw new IllegalArgumentException("Payment amount does not match the order total");

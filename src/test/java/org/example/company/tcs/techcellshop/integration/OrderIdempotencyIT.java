@@ -11,13 +11,14 @@ import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -56,7 +57,7 @@ class OrderIdempotencyIT extends AbstractPostgresIT {
         device.setDeviceStorage("128GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(1200.0);
+        device.setDevicePrice(money("1200.00"));
         device.setDeviceStock(10);
         device.setDeviceCondition("NEW");
         device = deviceRepository.save(device);
@@ -101,5 +102,9 @@ class OrderIdempotencyIT extends AbstractPostgresIT {
         assertThat(id1).isEqualTo(id2);
         assertThat(orderRepository.count()).isEqualTo(1);
         assertThat(orderIdempondencyRepository.findByIdempotencyKey(sameKey)).isPresent();
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

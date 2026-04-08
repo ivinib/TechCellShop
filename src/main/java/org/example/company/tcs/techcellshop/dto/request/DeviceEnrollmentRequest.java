@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class DeviceEnrollmentRequest {
 
@@ -43,7 +45,7 @@ public class DeviceEnrollmentRequest {
     @Schema(example = "3999.99")
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.01", message = "Price must be greater than zero")
-    private Double devicePrice;
+    private BigDecimal devicePrice;
 
     @Schema(example = "20")
     @NotNull(message = "Stock is required")

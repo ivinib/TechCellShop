@@ -22,15 +22,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -100,22 +100,22 @@ class OrderControllerTest {
         mockOrder = new Order();
         mockOrder.setIdOrder(1L);
         mockOrder.setQuantityOrder(1);
-        mockOrder.setTotalPriceOrder(3999.90);
+        mockOrder.setTotalPriceOrder(money("3999.90"));
 
         mockOrderResponse = new OrderResponse(
                 1L,
                 new UserSummaryResponse(1L, "Ana Silva", "a***a@techcellshop.com"),
-                new DeviceSummaryResponse(1L, "Galaxy S24", 3999.90),
+                new DeviceSummaryResponse(1L, "Galaxy S24", money("3999.90")),
                 1,
-                3999.90,
+                money("3999.90"),
                 OrderStatus.CREATED,
                 "2026-04-01",
                 "2026-04-06",
                 "CREDIT_CARD",
                 PaymentStatus.PENDING,
                 "WELCOME10",
-                BigDecimal.valueOf(0.10),
-                BigDecimal.valueOf(10),
+                money("10.00"),
+                money("3989.90"),
                 "User wants to pay with another card"
         );
     }
@@ -276,15 +276,15 @@ class OrderControllerTest {
                     mockOrderResponse.user(),
                     mockOrderResponse.device(),
                     1,
-                    3999.90,
+                    money("3999.90"),
                     OrderStatus.PAID,
                     "2026-04-01",
                     "2026-04-10",
                     "CREDIT_CARD",
                     PaymentStatus.CONFIRMED,
                     "WELCOME10",
-                    BigDecimal.valueOf(0.10),
-                    BigDecimal.valueOf(10),
+                    money("10.00"),
+                    money("3989.90"),
                     "User wants to pay with another card"
             );
 
@@ -379,15 +379,15 @@ class OrderControllerTest {
                     mockOrderResponse.user(),
                     mockOrderResponse.device(),
                     1,
-                    3999.90,
+                    money("3999.90"),
                     OrderStatus.SHIPPED,
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
                     PaymentStatus.CONFIRMED,
                     "WELCOME10",
-                    BigDecimal.valueOf(0.10),
-                    BigDecimal.valueOf(10),
+                    money("10.00"),
+                    money("3989.90"),
                     "User wants to pay with another card"
             );
 
@@ -437,15 +437,15 @@ class OrderControllerTest {
                     mockOrderResponse.user(),
                     mockOrderResponse.device(),
                     1,
-                    3999.90,
+                    money("3999.90"),
                     OrderStatus.CANCELED,
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
                     PaymentStatus.FAILED,
                     "WELCOME10",
-                    BigDecimal.valueOf(0.10),
-                    BigDecimal.valueOf(10),
+                    money("10.00"),
+                    money("3989.90"),
                     "User wants to pay with another card"
             );
 
@@ -475,15 +475,15 @@ class OrderControllerTest {
                     mockOrderResponse.user(),
                     mockOrderResponse.device(),
                     1,
-                    3999.90,
+                    money("3999.90"),
                     OrderStatus.CREATED,
                     "2026-04-01",
                     "2026-04-06",
                     "CREDIT_CARD",
                     PaymentStatus.PENDING,
                     "WELCOME10",
-                    BigDecimal.valueOf(0.10),
-                    BigDecimal.valueOf(10),
+                    money("10.00"),
+                    money("3989.90"),
                     "User wants to pay with another card"
             );
 
@@ -498,5 +498,9 @@ class OrderControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.idOrder").value(1L));
         }
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

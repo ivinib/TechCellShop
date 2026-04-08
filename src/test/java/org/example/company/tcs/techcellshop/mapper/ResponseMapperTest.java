@@ -11,6 +11,7 @@ import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -42,7 +43,7 @@ class ResponseMapperTest {
         device.setDeviceStorage("256GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(3999.90);
+        device.setDevicePrice(money("3999.90"));
         device.setDeviceStock(10);
         device.setDeviceCondition("NEW");
 
@@ -51,7 +52,7 @@ class ResponseMapperTest {
         order.setUser(user);
         order.setDevice(device);
         order.setQuantityOrder(2);
-        order.setTotalPriceOrder(7999.80);
+        order.setTotalPriceOrder(money("7999.80"));
         order.setStatus(OrderStatus.CREATED);
         order.setOrderDate("2026-03-24");
         order.setDeliveryDate("2026-03-31");
@@ -77,7 +78,6 @@ class ResponseMapperTest {
 
         UserResponse result = responseMapper.toUserResponse(user);
 
-        // local "ab" has length == 2, so: firstChar + "***@" + domain
         assertThat(result.emailUserMasked()).isEqualTo("a***@techcellshop.com");
     }
 
@@ -110,7 +110,7 @@ class ResponseMapperTest {
         assertThat(result.deviceStorage()).isEqualTo("256GB");
         assertThat(result.deviceRam()).isEqualTo("8GB");
         assertThat(result.deviceColor()).isEqualTo("Black");
-        assertThat(result.devicePrice()).isEqualTo(3999.90);
+        assertThat(result.devicePrice()).isEqualByComparingTo("3999.90");
         assertThat(result.deviceStock()).isEqualTo(10);
         assertThat(result.deviceCondition()).isEqualTo("NEW");
     }
@@ -129,12 +129,12 @@ class ResponseMapperTest {
 
         assertThat(result.idOrder()).isEqualTo(1L);
         assertThat(result.quantityOrder()).isEqualTo(2);
-        assertThat(result.totalPriceOrder()).isEqualTo(7999.80);
-        assertThat(result.statusOrder()).isEqualTo("CREATED");
+        assertThat(result.totalPriceOrder()).isEqualByComparingTo("7999.80");
+        assertThat(result.statusOrder()).isEqualTo(OrderStatus.CREATED);
         assertThat(result.orderDate()).isEqualTo("2026-03-24");
         assertThat(result.deliveryDate()).isEqualTo("2026-03-31");
         assertThat(result.paymentMethod()).isEqualTo("CREDIT_CARD");
-        assertThat(result.paymentStatus()).isEqualTo("PENDING");
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
 
         assertThat(result.user()).isNotNull();
         assertThat(result.user().idUser()).isEqualTo(1L);
@@ -144,7 +144,7 @@ class ResponseMapperTest {
         assertThat(result.device()).isNotNull();
         assertThat(result.device().idDevice()).isEqualTo(1L);
         assertThat(result.device().nameDevice()).isEqualTo("Galaxy S24");
-        assertThat(result.device().devicePrice()).isEqualTo(3999.90);
+        assertThat(result.device().devicePrice()).isEqualByComparingTo("3999.90");
     }
 
     @Test
@@ -171,5 +171,9 @@ class ResponseMapperTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).statusOrder()).isEqualTo(OrderStatus.CREATED);
+    }
+
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }
