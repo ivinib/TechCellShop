@@ -1,6 +1,6 @@
 package org.example.company.tcs.techcellshop.messaging;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -70,8 +70,8 @@ public class OutboxPublisherJob {
 
     private void processEvent(OutboxEvent event) {
         publishTimer.record(() -> {
-            try{
-                OrderCreatedDomainEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedDomainEvent.class);
+            try {
+                OrderCreatedEvent payload = objectMapper.readValue(event.getPayload(), OrderCreatedEvent.class);
                 rabbitTemplate.convertAndSend(exchange, routingKey, payload);
 
                 event.setStatus(OutboxEventStatus.SENT);
@@ -82,15 +82,16 @@ public class OutboxPublisherJob {
                 publishSuccessCounter.increment();
 
                 log.info("Outbox: Successfully published event id={} type={}", event.getId(), event.getEventType());
-            }catch (JsonMappingException jsonMappingException){
+            } catch (JsonProcessingException jsonProcessingException) {
                 event.setAttempts(MAX_ATTEMPTS);
                 event.setStatus(OutboxEventStatus.FAILED);
-                event.setLastError("Failed to deserialize payload: " + jsonMappingException.getMessage());
+                event.setLastError("Failed to deserialize payload: " + jsonProcessingException.getMessage());
 
                 outboxEventRepository.save(event);
                 publishFailureCounter.increment();
                 publishPermanentFailureCounter.increment();
-                log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED", jsonMappingException.getMessage(), event.getId());
+                log.error("Outbox: corrupted payload: {}, for event id: {}, marking as FAILED",
+                        jsonProcessingException.getMessage(), event.getId());
             }catch (Exception ex){
                 int newAttempt = event.getAttempts() + 1;
                 event.setAttempts(newAttempt);

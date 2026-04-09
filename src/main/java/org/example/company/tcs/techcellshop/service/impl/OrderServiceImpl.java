@@ -16,6 +16,7 @@ import org.example.company.tcs.techcellshop.service.CouponService;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.service.OrderStatusTransitionValidator;
+import org.example.company.tcs.techcellshop.util.MoneyUtils;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.OutboxEventStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
@@ -163,9 +164,9 @@ public class OrderServiceImpl implements OrderService {
             order.setOrderDate(LocalDate.now().toString());
             order.setDeliveryDate(LocalDate.now().plusDays(5).toString());
 
-            BigDecimal total = device.getDevicePrice().multiply(BigDecimal.valueOf(quantity));
+            BigDecimal total = MoneyUtils.multiply(device.getDevicePrice(), quantity);
             order.setTotalPriceOrder(total);
-            order.setDiscountAmount(BigDecimal.ZERO);
+            order.setDiscountAmount(MoneyUtils.zero());
             order.setFinalAmount(total);
 
             Order saved = orderRepository.save(order);
@@ -239,13 +240,9 @@ public class OrderServiceImpl implements OrderService {
                 throw new CouponValidationException("An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode());
             }
 
-            BigDecimal orderAmount = order.getTotalPriceOrder();
-            BigDecimal discount = couponService.calculateDiscount(couponCode, orderAmount);
-            BigDecimal finalAmount = orderAmount.subtract(discount);
-
-            if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
-                finalAmount = BigDecimal.ZERO;
-            }
+            BigDecimal orderAmount = MoneyUtils.normalize(order.getTotalPriceOrder());
+            BigDecimal discount = MoneyUtils.normalize(couponService.calculateDiscount(couponCode, orderAmount));
+            BigDecimal finalAmount = MoneyUtils.subtractFloorZero(orderAmount, discount);
 
             order.setCouponCode(couponCode);
             order.setDiscountAmount(discount);

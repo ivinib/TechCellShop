@@ -4,6 +4,7 @@ import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.*;
+import org.example.company.tcs.techcellshop.util.MoneyUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -107,7 +108,7 @@ public class RequestMapper {
         device.setDeviceStorage(deviceStorage);
         device.setDeviceRam(deviceRam);
         device.setDeviceColor(deviceColor);
-        device.setDevicePrice(devicePrice);
+        device.setDevicePrice(MoneyUtils.normalize(devicePrice));
         device.setDeviceStock(deviceStock);
         device.setDeviceCondition(deviceCondition);
     }

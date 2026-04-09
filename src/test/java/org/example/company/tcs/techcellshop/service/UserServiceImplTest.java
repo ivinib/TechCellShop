@@ -12,6 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -53,7 +57,7 @@ class UserServiceImplTest {
     @Test
     void saveUser_whenEmailDoesNotExist_shouldEncodePasswordAndReturnUserWithNullPassword() {
         when(userRepository.existsByEmailUserIgnoreCase(user.getEmailUser())).thenReturn(false);
-        when(passwordEncoder.encode("senha123")).thenReturn("encodedPassword");
+        doReturn("encodedPassword").when(passwordEncoder).encode(anyString());
         when(userRepository.save(any(User.class))).thenReturn(user);
 
         User result = userService.saveUser(user);
@@ -96,21 +100,23 @@ class UserServiceImplTest {
 
     @Test
     void getAllUsers_shouldReturnAllUsers() {
-        when(userRepository.findAll()).thenReturn(List.of(user));
+        Page<User> page = new PageImpl<>(List.of(user), PageRequest.of(0, 20), 1);
+        when(userRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        List<User> result = userService.getAllUsers();
+        Page<User> result = userService.getAllUsers(PageRequest.of(0, 20));
 
-        assertThat(result).hasSize(1);
-        assertThat(result.getFirst().getNameUser()).isEqualTo("Ana Silva");
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().getNameUser()).isEqualTo("Ana Silva");
     }
 
     @Test
     void getAllUsers_whenEmpty_shouldReturnEmptyList() {
-        when(userRepository.findAll()).thenReturn(List.of());
+        when(userRepository.findAll(any(Pageable.class)))
+                .thenReturn(Page.empty(PageRequest.of(0, 20)));
 
-        List<User> result = userService.getAllUsers();
+        Page<User> result = userService.getAllUsers(PageRequest.of(0, 20));
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
     }
 
     @Test
@@ -131,13 +137,27 @@ class UserServiceImplTest {
         updatedUser.setRoleUser("USER");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        doAnswer(invocation -> {
+            User target = invocation.getArgument(0);
+            UserUpdateRequest request = invocation.getArgument(1);
+            target.setNameUser(request.getNameUser());
+            target.setEmailUser(request.getEmailUser());
+            target.setPhoneUser(request.getPhoneUser());
+            target.setAddressUser(request.getAddressUser());
+            target.setRoleUser(request.getRoleUser());
+            return null;
+        }).when(requestMapper).updateUser(any(User.class), any(UserUpdateRequest.class));
+
         when(userRepository.save(any(User.class))).thenReturn(updatedUser);
 
         User result = userService.updateUser(1L, updateRequest);
 
         assertThat(result.getNameUser()).isEqualTo("Ana Updated");
         assertThat(result.getEmailUser()).isEqualTo("ana.updated@techcellshop.com");
+        verify(requestMapper).updateUser(user, updateRequest);
         verify(userRepository).save(any(User.class));
+
     }
 
     @Test

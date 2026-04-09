@@ -6,6 +6,7 @@ import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
 import org.example.company.tcs.techcellshop.service.PaymentService;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ class PaymentControllerTest {
     @BeforeEach
     void setUp() {
         this.mockMvc = webAppContextSetup(context)
+                .addFilters(context.getBean(TraceIdFilter.class))
                 .apply(springSecurity())
                 .build();
 
@@ -134,23 +136,28 @@ class PaymentControllerTest {
     @DisplayName("POST /payments/orders/{id}/confirm should require authentication")
     void confirm_shouldReject_whenUnauthenticated() throws Exception {
         mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
+                        .header("X-Trace-Id", "test-trace-id")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.error").value("Unauthorized"));
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
     }
 
     @Test
     @WithMockUser(roles = "USER")
     void confirm_shouldReturn403_whenUserIsNotAdmin() throws Exception {
         mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
+                        .header("X-Trace-Id", "test-trace-id")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.error").value("Forbidden"))
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
     }
 
     @Test
@@ -158,11 +165,25 @@ class PaymentControllerTest {
     void confirm_shouldReturn401_whenTokenIsMalformed() throws Exception {
         mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
                         .header("Authorization", "Bearer not-a-valid-jwt")
+                        .header("X-Trace-Id", "test-trace-id")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.error").value("Unauthorized"))
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void confirm_shouldReturn400_whenAmountHasMoreThanTwoDecimalPlaces() throws Exception {
+        validRequest.setAmount(new BigDecimal("3999.999"));
+
+        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.amount").exists());
     }
 }

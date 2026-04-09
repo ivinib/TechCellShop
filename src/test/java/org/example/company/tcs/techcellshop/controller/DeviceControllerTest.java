@@ -10,6 +10,7 @@ import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.DeviceService;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -75,6 +76,7 @@ class DeviceControllerTest {
     @BeforeEach
     void setUp() {
         this.mockMvc = webAppContextSetup(context)
+                .addFilters(context.getBean(TraceIdFilter.class))
                 .apply(springSecurity())
                 .build();
 
@@ -195,9 +197,14 @@ class DeviceControllerTest {
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
             mockMvc.perform(post("/api/v1/devices")
+                            .header("X-Trace-Id", "test-trace-id")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                    .andExpect(jsonPath("$.traceId").value("test-trace-id"));
         }
     }
 
@@ -241,8 +248,13 @@ class DeviceControllerTest {
         @Test
         @DisplayName("Should return 401 when unauthenticated")
         void shouldReturn401_whenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/api/v1/devices"))
-                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(get("/api/v1/devices")
+                            .header("X-Trace-Id", "test-trace-id"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.error").value("Unauthorized"))
+                    .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                    .andExpect(jsonPath("$.traceId").value("test-trace-id"));
         }
     }
 
@@ -270,12 +282,15 @@ class DeviceControllerTest {
             when(deviceService.getDeviceById(99L))
                     .thenThrow(new ResourceNotFoundException("Device not found with id: 99"));
 
-            mockMvc.perform(get("/api/v1/devices/99"))
+            mockMvc.perform(get("/api/v1/devices/99")
+                            .header("X-Trace-Id", "test-trace-id"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404))
                     .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"))
+                    .andExpect(jsonPath("$.traceId").value("test-trace-id"));
         }
     }
 
@@ -310,13 +325,16 @@ class DeviceControllerTest {
                     .thenThrow(new ResourceNotFoundException("Device not found with id: 99"));
 
             mockMvc.perform(put("/api/v1/devices/99")
+                            .header("X-Trace-Id", "test-trace-id")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validUpdateRequest)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404))
                     .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"))
+                    .andExpect(jsonPath("$.traceId").value("test-trace-id"));
         }
     }
 
@@ -360,13 +378,28 @@ class DeviceControllerTest {
             doThrow(new ResourceNotFoundException("Device not found with id: 99"))
                     .when(deviceService).deleteDevice(99L);
 
-            mockMvc.perform(delete("/api/v1/devices/99"))
+            mockMvc.perform(delete("/api/v1/devices/99")
+                            .header("X-Trace-Id", "test-trace-id"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404))
                     .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
                     .andExpect(jsonPath("$.message").value("Device not found with id: 99"))
-                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"));
+                    .andExpect(jsonPath("$.path").value("/api/v1/devices/99"))
+                    .andExpect(jsonPath("$.traceId").value("test-trace-id"));
         }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400_whenPriceHasMoreThanTwoDecimalPlaces() throws Exception {
+        validRequest.setDevicePrice(new BigDecimal("3999.999"));
+
+        mockMvc.perform(post("/api/v1/devices")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.devicePrice").exists());
     }
 
     private BigDecimal money(String value) {

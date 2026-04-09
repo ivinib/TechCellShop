@@ -45,6 +45,7 @@ public class DeviceUpdateRequest {
     @Schema(example = "3999.99")
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.01", message = "Price must be greater than zero")
+    @Digits(integer = 10, fraction = 2, message = "Price must have up to 10 integer digits and 2 decimal places")
     private BigDecimal devicePrice;
 
     @Schema(example = "20")

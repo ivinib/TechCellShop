@@ -12,6 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -82,21 +86,23 @@ class DeviceServiceImplTest {
 
     @Test
     void getAllDevices_shouldReturnAllDevices() {
-        when(deviceRepository.findAll()).thenReturn(List.of(device));
+        Page<Device> page = new PageImpl<>(List.of(device), PageRequest.of(0, 20), 1);
+        when(deviceRepository.findAll(any(Pageable.class))).thenReturn(page);
 
-        List<Device> result = deviceService.getAllDevices();
+        Page<Device> result = deviceService.getAllDevices(PageRequest.of(0, 20));
 
-        assertThat(result).hasSize(1);
-        assertThat(result.getFirst().getNameDevice()).isEqualTo("Galaxy S24");
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().getNameDevice()).isEqualTo("Galaxy S24");
     }
 
     @Test
     void getAllDevices_whenEmpty_shouldReturnEmptyList() {
-        when(deviceRepository.findAll()).thenReturn(List.of());
+        when(deviceRepository.findAll(any(Pageable.class)))
+                .thenReturn(Page.empty(PageRequest.of(0, 20)));
 
-        List<Device> result = deviceService.getAllDevices();
+        Page<Device> result = deviceService.getAllDevices(PageRequest.of(0, 20));
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
     }
 
     @Test
@@ -125,6 +131,22 @@ class DeviceServiceImplTest {
         updatedDevice.setDeviceCondition("NEW");
 
         when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
+
+        doAnswer(invocation -> {
+            Device target = invocation.getArgument(0);
+            DeviceUpdateRequest request = invocation.getArgument(1);
+            target.setNameDevice(request.getNameDevice());
+            target.setDescriptionDevice(request.getDescriptionDevice());
+            target.setDeviceType(request.getDeviceType());
+            target.setDeviceStorage(request.getDeviceStorage());
+            target.setDeviceRam(request.getDeviceRam());
+            target.setDeviceColor(request.getDeviceColor());
+            target.setDevicePrice(request.getDevicePrice());
+            target.setDeviceStock(request.getDeviceStock());
+            target.setDeviceCondition(request.getDeviceCondition());
+            return null;
+        }).when(requestMapper).updateDevice(any(Device.class), any(DeviceUpdateRequest.class));
+
         when(deviceRepository.save(any(Device.class))).thenReturn(updatedDevice);
 
         Device result = deviceService.updateDevice(1L, updateRequest);
@@ -133,6 +155,7 @@ class DeviceServiceImplTest {
         assertThat(result.getDevicePrice()).isEqualByComparingTo("4999.90");
         assertThat(result.getDeviceStock()).isEqualTo(5);
         assertThat(result.getDeviceStorage()).isEqualTo("512GB");
+        verify(requestMapper).updateDevice(device, updateRequest);
         verify(deviceRepository).save(any(Device.class));
     }
 

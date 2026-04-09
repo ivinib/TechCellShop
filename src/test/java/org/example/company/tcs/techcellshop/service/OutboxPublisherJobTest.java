@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -34,16 +35,17 @@ import static org.mockito.Mockito.*;
 @DisplayName("OutboxPublisherJob")
 class OutboxPublisherJobTest {
 
+    private static final BigDecimal TOTAL_PRICE = new BigDecimal("3999.90");
+
     @Mock private OutboxEventRepository outboxEventRepository;
     @Mock private RabbitTemplate rabbitTemplate;
 
-    // Use real ObjectMapper so serialization/deserialization round-trips correctly
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
     private OutboxPublisherJob job;
-
     private OutboxEvent pendingEvent;
+    private OrderCreatedEvent expectedEvent;
 
     @BeforeEach
     void setUp() {
@@ -56,10 +58,10 @@ class OutboxPublisherJobTest {
                 new SimpleMeterRegistry()
         );
 
-        OrderCreatedEvent event = new OrderCreatedEvent(
+        expectedEvent = new OrderCreatedEvent(
                 UUID.randomUUID().toString(),
                 1L, 1L, 1L, 1,
-                3999.90,
+                TOTAL_PRICE,
                 "PIX",
                 OrderStatus.CREATED,
                 PaymentStatus.PENDING,
@@ -68,7 +70,7 @@ class OutboxPublisherJobTest {
 
         pendingEvent = new OutboxEvent();
         pendingEvent.setId(1L);
-        pendingEvent.setEventId(event.eventId());
+        pendingEvent.setEventId(expectedEvent.eventId());
         pendingEvent.setEventType("order.created");
         pendingEvent.setAggregateType("Order");
         pendingEvent.setAggregateId(1L);
@@ -78,7 +80,7 @@ class OutboxPublisherJobTest {
         pendingEvent.setCreatedAt(Instant.now().minusSeconds(5));
 
         try {
-            pendingEvent.setPayload(objectMapper.writeValueAsString(event));
+            pendingEvent.setPayload(objectMapper.writeValueAsString(expectedEvent));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -98,8 +100,22 @@ class OutboxPublisherJobTest {
 
             job.pollAndPublishOutboxEvents();
 
+            ArgumentCaptor<OrderCreatedEvent> payloadCaptor = ArgumentCaptor.forClass(OrderCreatedEvent.class);
             verify(rabbitTemplate).convertAndSend(
-                    eq("test.exchange"), eq("test.routing-key"), any(OrderCreatedEvent.class));
+                    eq("test.exchange"),
+                    eq("test.routing-key"),
+                    payloadCaptor.capture()
+            );
+
+            OrderCreatedEvent published = payloadCaptor.getValue();
+            assertThat(published.orderId()).isEqualTo(expectedEvent.orderId());
+            assertThat(published.userId()).isEqualTo(expectedEvent.userId());
+            assertThat(published.deviceId()).isEqualTo(expectedEvent.deviceId());
+            assertThat(published.quantity()).isEqualTo(expectedEvent.quantity());
+            assertThat(published.paymentMethod()).isEqualTo(expectedEvent.paymentMethod());
+            assertThat(published.status()).isEqualTo(expectedEvent.status());
+            assertThat(published.paymentStatus()).isEqualTo(expectedEvent.paymentStatus());
+            assertThat(published.totalPrice()).isEqualByComparingTo(TOTAL_PRICE);
 
             ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
             verify(outboxEventRepository).save(captor.capture());
@@ -117,7 +133,7 @@ class OutboxPublisherJobTest {
                     eq(OutboxEventStatus.PENDING), any(Instant.class), any(Pageable.class)))
                     .thenReturn(List.of(pendingEvent));
             doThrow(new RuntimeException("broker unavailable"))
-                    .when(rabbitTemplate).convertAndSend(any(), any(), any(Object.class));
+                    .when(rabbitTemplate).convertAndSend(any(), any(), any(OrderCreatedEvent.class));
             when(outboxEventRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             job.pollAndPublishOutboxEvents();
@@ -135,13 +151,13 @@ class OutboxPublisherJobTest {
         @Test
         @DisplayName("should mark FAILED permanently after max attempts")
         void shouldMarkFailed_whenMaxAttemptsReached() {
-            pendingEvent.setAttempts(4); // one more will hit MAX_ATTEMPTS = 5
+            pendingEvent.setAttempts(4);
 
             when(outboxEventRepository.findPendingBatch(
                     eq(OutboxEventStatus.PENDING), any(Instant.class), any(Pageable.class)))
                     .thenReturn(List.of(pendingEvent));
             doThrow(new RuntimeException("still down"))
-                    .when(rabbitTemplate).convertAndSend(any(), any(), any(Object.class));
+                    .when(rabbitTemplate).convertAndSend(any(), any(), any(OrderCreatedEvent.class));
             when(outboxEventRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             job.pollAndPublishOutboxEvents();
@@ -163,7 +179,7 @@ class OutboxPublisherJobTest {
 
             job.pollAndPublishOutboxEvents();
 
-            verify(rabbitTemplate, never()).convertAndSend(any(), any(), any(Object.class));
+            verify(rabbitTemplate, never()).convertAndSend(any(), any(), any(OrderCreatedEvent.class));
             verify(outboxEventRepository, never()).save(any());
         }
 

@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.example.company.tcs.techcellshop.domain.Coupon;
 import org.example.company.tcs.techcellshop.util.DiscountType;
+import org.example.company.tcs.techcellshop.util.MoneyUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 import org.example.company.tcs.techcellshop.exception.CouponValidationException;
@@ -13,7 +14,9 @@ import org.example.company.tcs.techcellshop.service.CouponService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.function.Supplier;
 
 @Service
 public class CouponServiceImpl  implements CouponService {
@@ -49,7 +52,7 @@ public class CouponServiceImpl  implements CouponService {
             couponValidationFailureCounter.increment();
 
             responseDto.setValid(false);
-            responseDto.setDiscountAmount(BigDecimal.ZERO);
+            responseDto.setDiscountAmount(MoneyUtils.zero());
             responseDto.setMessage(ex.getLocalizedMessage());
         }
         return responseDto;
@@ -57,23 +60,26 @@ public class CouponServiceImpl  implements CouponService {
 
 
     @Override
-    @Transactional(readOnly = true)
     public BigDecimal calculateDiscount(String code, BigDecimal orderAmount) {
-        return couponDiscountTimer.record(() -> {
+        Supplier<BigDecimal> discountCalculation = () -> {
             Coupon coupon = couponRepository.findByCodeIgnoreCase(code)
                     .orElseThrow(() -> new CouponValidationException("Invalid coupon code: " + code));
 
-            validateCouponRules(coupon, orderAmount);
+            BigDecimal normalizedOrderAmount = MoneyUtils.normalize(orderAmount);
+            validateCouponRules(coupon, normalizedOrderAmount);
 
             if (DiscountType.PERCENT.equals(coupon.getType())) {
-                return orderAmount
+                BigDecimal percentDiscount = normalizedOrderAmount
                         .multiply(coupon.getValue())
-                        .divide(BigDecimal.valueOf(100));
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                return MoneyUtils.normalize(percentDiscount);
             }
 
-            BigDecimal fixed = coupon.getValue();
-            return fixed.min(orderAmount);
-        });
+            BigDecimal fixed = MoneyUtils.normalize(coupon.getValue());
+            return MoneyUtils.normalize(fixed.min(normalizedOrderAmount));
+        };
+
+        return couponDiscountTimer.record(discountCalculation);
     }
 
     @Transactional
@@ -107,10 +113,10 @@ public class CouponServiceImpl  implements CouponService {
             throw new CouponValidationException("Order amount does not meet the minimum required for this coupon: " + coupon.getCode());
         }
 
-        Integer quantityUsed = (null == coupon.getUsedCount()) ? 0 : coupon.getUsedCount();
+        int quantityUsed = coupon.getUsedCount() == null ? 0 : coupon.getUsedCount();
         Integer usageLimit = coupon.getMaxUses();
 
-        if (null != usageLimit && quantityUsed >= usageLimit) {
+        if (usageLimit != null && quantityUsed >= usageLimit) {
             throw new CouponValidationException("Coupon usage limit reached");
         }
     }
