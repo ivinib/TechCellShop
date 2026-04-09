@@ -15,6 +15,7 @@ import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -78,11 +79,11 @@ class OrderControllerTest {
     @BeforeEach
     void setUp() {
         this.mockMvc = webAppContextSetup(context)
+                .addFilters(context.getBean(TraceIdFilter.class))
                 .apply(springSecurity())
                 .build();
 
         validEnrollmentRequest = new OrderEnrollmentRequest();
-        validEnrollmentRequest.setIdUser(1L);
         validEnrollmentRequest.setIdDevice(1L);
         validEnrollmentRequest.setQuantityOrder(1);
         validEnrollmentRequest.setPaymentMethod("CREDIT_CARD");
@@ -125,10 +126,11 @@ class OrderControllerTest {
     class SaveOrder {
 
         @Test
-        @WithMockUser
+        @WithMockUser(username = "customer@test.com", roles = "USER")
         @DisplayName("Should return 201 when request is valid")
         void shouldReturn201_whenRequestIsValid() throws Exception {
-            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("KEY-001"))).thenReturn(mockOrder);
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("customer@test.com"), eq("KEY-001")))
+                    .thenReturn(mockOrder);
             when(responseMapper.toOrderResponse(mockOrder)).thenReturn(mockOrderResponse);
 
             mockMvc.perform(post("/api/v1/orders")
@@ -152,7 +154,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(username = "customer@test.com", roles = "USER")
         @DisplayName("Should return 400 when Idempotency-Key is missing")
         void shouldReturn400_whenIdempotencyKeyIsMissing() throws Exception {
             mockMvc.perform(post("/api/v1/orders")
@@ -166,10 +168,10 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(username = "customer@test.com", roles = "USER")
         @DisplayName("Should return 409 when stock is insufficient")
         void shouldReturn409_whenStockIsInsufficient() throws Exception {
-            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("KEY-001")))
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("customer@test.com"), eq("KEY-001")))
                     .thenThrow(new InsufficientStockException("Insufficient stock for device id 1"));
 
             mockMvc.perform(post("/api/v1/orders")
@@ -190,7 +192,7 @@ class OrderControllerTest {
     class GetAllOrders {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 with order list")
         void shouldReturn200_withOrderList() throws Exception {
             Page<Order> ordersPage = new PageImpl<>(List.of(mockOrder), PageRequest.of(0, 20), 1);
@@ -222,7 +224,7 @@ class OrderControllerTest {
     class GetOrderById {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when order is found")
         void shouldReturn200_whenOrderIsFound() throws Exception {
             when(orderService.getOrderById(1L)).thenReturn(mockOrder);
@@ -234,7 +236,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when order is not found")
         void shouldReturn404_whenOrderIsNotFound() throws Exception {
             when(orderService.getOrderById(99L))
@@ -249,7 +251,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should include traceId in error response")
         void shouldIncludeTraceIdInErrorResponse() throws Exception {
             when(orderService.getOrderById(99L))
@@ -268,7 +270,7 @@ class OrderControllerTest {
     class UpdateOrder {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when order is updated")
         void shouldReturn200_whenOrderIsUpdated() throws Exception {
             OrderResponse updatedResponse = new OrderResponse(
@@ -300,7 +302,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when order is not found")
         void shouldReturn404_whenOrderIsNotFound() throws Exception {
             when(orderService.updateOrder(eq(99L), any(OrderUpdateRequest.class)))
@@ -322,7 +324,7 @@ class OrderControllerTest {
     class PartialUpdateOrder {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when partially updated")
         void shouldReturn200_whenPartiallyUpdated() throws Exception {
             when(orderService.updateOrder(eq(1L), any(OrderUpdateRequest.class))).thenReturn(mockOrder);
@@ -341,7 +343,7 @@ class OrderControllerTest {
     class DeleteOrder {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 204 when order is deleted")
         void shouldReturn204_whenOrderIsDeleted() throws Exception {
             doNothing().when(orderService).deleteOrder(1L);
@@ -351,7 +353,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when order is not found")
         void shouldReturn404_whenOrderIsNotFound() throws Exception {
             doThrow(new ResourceNotFoundException("Order not found with id: 99"))
@@ -371,7 +373,7 @@ class OrderControllerTest {
     class UpdateStatus {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when status is updated")
         void shouldReturn200_whenStatusIsUpdated() throws Exception {
             OrderResponse shippedResponse = new OrderResponse(
@@ -406,7 +408,7 @@ class OrderControllerTest {
         }
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when newStatus is missing")
         void shouldReturn400_whenNewStatusIsMissing() throws Exception {
             OrderStatusUpdateRequestDto invalid = new OrderStatusUpdateRequestDto();
@@ -429,7 +431,7 @@ class OrderControllerTest {
     class CancelOrder {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when order is canceled")
         void shouldReturn200_whenOrderIsCanceled() throws Exception {
             OrderResponse canceledResponse = new OrderResponse(
@@ -467,7 +469,7 @@ class OrderControllerTest {
     class ApplyCoupon {
 
         @Test
-        @WithMockUser
+        @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when coupon is applied")
         void shouldReturn200_whenCouponIsApplied() throws Exception {
             OrderResponse discounted = new OrderResponse(

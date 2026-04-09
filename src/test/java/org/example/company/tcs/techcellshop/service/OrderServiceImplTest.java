@@ -4,13 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.domain.OrderIdempondency;
+import org.example.company.tcs.techcellshop.domain.OutboxEvent;
+import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
-import org.example.company.tcs.techcellshop.domain.*;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
-import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
-import org.example.company.tcs.techcellshop.repository.*;
+import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
+import org.example.company.tcs.techcellshop.repository.OrderRepository;
+import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
+import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.impl.OrderServiceImpl;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
@@ -19,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -27,6 +33,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +42,12 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceImplTest {
@@ -79,7 +91,6 @@ class OrderServiceImplTest {
     @Mock
     private Timer timer;
 
-    @InjectMocks
     private OrderServiceImpl orderService;
 
     private Order order;
@@ -90,8 +101,12 @@ class OrderServiceImplTest {
     void setUp() {
         when(meterRegistry.counter(anyString())).thenReturn(counter);
         when(meterRegistry.timer(anyString())).thenReturn(timer);
-        doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get())
-                .when(timer).record(any(Supplier.class));
+        doAnswer(invocation -> {
+            Supplier<?> supplier = invocation.getArgument(0);
+            return supplier.get();
+        }).when(timer).record(org.mockito.ArgumentMatchers.<Supplier<?>>any());
+
+        orderService = newOrderService();
 
         user = new User();
         user.setIdUser(1L);
@@ -174,7 +189,7 @@ class OrderServiceImplTest {
             Page<Order> result = orderService.getAllOrders(PageRequest.of(0, 20));
 
             assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().get(0).getStatus()).isEqualTo(OrderStatus.CREATED);
+            assertThat(result.getContent().getFirst().getStatus()).isEqualTo(OrderStatus.CREATED);
         }
 
         @Test
@@ -279,12 +294,12 @@ class OrderServiceImplTest {
     @DisplayName("placeOrder (with Idempotency-Key)")
     class PlaceOrderIdempotency {
 
+        private static final String AUTHENTICATED_EMAIL = "ana@techcellshop.com";
         private OrderEnrollmentRequest request;
 
         @BeforeEach
         void setUpRequest() {
             request = new OrderEnrollmentRequest();
-            request.setIdUser(1L);
             request.setIdDevice(1L);
             request.setQuantityOrder(1);
             request.setPaymentMethod("PIX");
@@ -295,7 +310,8 @@ class OrderServiceImplTest {
         void shouldCreateOrderAndStoreRecord_whenKeyIsNew() throws Exception {
             when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
                     .thenReturn(Optional.empty());
-            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(userRepository.findByEmailUserIgnoreCase(AUTHENTICATED_EMAIL))
+                    .thenReturn(Optional.of(user));
             when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
             doNothing().when(deviceService).reserveStock(1L, 1);
 
@@ -313,13 +329,14 @@ class OrderServiceImplTest {
             when(orderIdempondencyRepository.save(any(OrderIdempondency.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
-            Order result = orderService.placeOrder(request, "KEY-001");
+            Order result = orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001");
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
             assertThat(result.getTotalPriceOrder()).isEqualByComparingTo("3999.90");
             assertThat(result.getDiscountAmount()).isEqualByComparingTo("0");
             assertThat(result.getFinalAmount()).isEqualByComparingTo("3999.90");
 
+            verify(userRepository).findByEmailUserIgnoreCase(AUTHENTICATED_EMAIL);
             verify(deviceService).reserveStock(1L, 1);
             verify(outboxEventRepository).save(any(OutboxEvent.class));
             verify(orderIdempondencyRepository).save(any(OrderIdempondency.class));
@@ -328,7 +345,7 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("existing key + same payload: should return existing order without creating a new one")
         void shouldReturnExistingOrder_whenKeyAlreadyExists() {
-            String rawHash = "1|1|1|PIX";
+            String rawHash = AUTHENTICATED_EMAIL + "|1|1|PIX";
             String expectedHash = sha256(rawHash);
 
             OrderIdempondency existingRecord = new OrderIdempondency();
@@ -339,11 +356,11 @@ class OrderServiceImplTest {
             when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
                     .thenReturn(Optional.of(existingRecord));
 
-            Order result = orderService.placeOrder(request, "KEY-001");
+            Order result = orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001");
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
 
-            verify(userRepository, never()).findById(any());
+            verify(userRepository, never()).findByEmailUserIgnoreCase(anyString());
             verify(orderRepository, never()).save(any());
             verify(orderIdempondencyRepository, never()).save(any());
         }
@@ -359,11 +376,11 @@ class OrderServiceImplTest {
             when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
                     .thenReturn(Optional.of(existingRecord));
 
-            assertThatThrownBy(() -> orderService.placeOrder(request, "KEY-001"))
+            assertThatThrownBy(() -> orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Idempotency key already used for a different request");
 
-            verify(userRepository, never()).findById(any());
+            verify(userRepository, never()).findByEmailUserIgnoreCase(anyString());
             verify(orderRepository, never()).save(any());
         }
 
@@ -375,6 +392,40 @@ class OrderServiceImplTest {
             } catch (java.security.NoSuchAlgorithmException e) {
                 throw new IllegalStateException("SHA-256 not available", e);
             }
+        }
+    }
+
+    private OrderServiceImpl newOrderService() {
+        try {
+            Constructor<OrderServiceImpl> constructor = OrderServiceImpl.class.getDeclaredConstructor(
+                    OrderRepository.class,
+                    RequestMapper.class,
+                    UserRepository.class,
+                    DeviceRepository.class,
+                    DeviceService.class,
+                    OrderStatusTransitionValidator.class,
+                    CouponService.class,
+                    OrderIdempondencyRepository.class,
+                    ObjectMapper.class,
+                    OutboxEventRepository.class,
+                    MeterRegistry.class
+            );
+            constructor.setAccessible(true);
+            return constructor.newInstance(
+                    orderRepository,
+                    requestMapper,
+                    userRepository,
+                    deviceRepository,
+                    deviceService,
+                    orderStatusTransitionValidator,
+                    couponService,
+                    orderIdempondencyRepository,
+                    objectMapper,
+                    outboxEventRepository,
+                    meterRegistry
+            );
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException(ex);
         }
     }
 

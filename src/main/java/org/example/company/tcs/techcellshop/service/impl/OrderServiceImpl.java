@@ -2,16 +2,27 @@ package org.example.company.tcs.techcellshop.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.transaction.Transactional;
-import org.example.company.tcs.techcellshop.domain.*;
-import org.example.company.tcs.techcellshop.exception.CouponValidationException;
-import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
+import org.example.company.tcs.techcellshop.domain.Device;
+import org.example.company.tcs.techcellshop.domain.Order;
+import org.example.company.tcs.techcellshop.domain.OrderIdempondency;
+import org.example.company.tcs.techcellshop.domain.OutboxEvent;
+import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.exception.CouponValidationException;
+import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.messaging.OrderCreatedEvent;
-import org.example.company.tcs.techcellshop.repository.*;
+import org.example.company.tcs.techcellshop.repository.DeviceRepository;
+import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
+import org.example.company.tcs.techcellshop.repository.OrderRepository;
+import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
+import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.CouponService;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.example.company.tcs.techcellshop.service.OrderService;
@@ -25,10 +36,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -47,8 +54,10 @@ import java.util.UUID;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    private final OrderRepository orderRepository;
     private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+    private static final String ORDER_NOT_FOUND = "No order found with id: ";
+
+    private final OrderRepository orderRepository;
     private final RequestMapper requestMapper;
     private final UserRepository userRepository;
     private final DeviceRepository deviceRepository;
@@ -56,8 +65,6 @@ public class OrderServiceImpl implements OrderService {
     private final DeviceService deviceService;
     private final OrderIdempondencyRepository orderIdempondencyRepository;
     private final OutboxEventRepository outboxEventRepository;
-    
-    private static final String ORDER_NOT_FOUND = "No order found with id: ";
     private final CouponService couponService;
     private final ObjectMapper objectMapper;
 
@@ -68,7 +75,19 @@ public class OrderServiceImpl implements OrderService {
     private final Timer orderPlaceTimer;
     private final Timer couponApplyTimer;
 
-    OrderServiceImpl(OrderRepository orderRepository, RequestMapper requestMapper, UserRepository userRepository, DeviceRepository deviceRepository, DeviceService deviceService, OrderStatusTransitionValidator orderStatusTransitionValidator, CouponService couponService, OrderIdempondencyRepository orderIdempondencyRepository, ObjectMapper objectMapper, OutboxEventRepository outboxEventRepository, MeterRegistry meterRegistry) {
+    OrderServiceImpl(
+            OrderRepository orderRepository,
+            RequestMapper requestMapper,
+            UserRepository userRepository,
+            DeviceRepository deviceRepository,
+            DeviceService deviceService,
+            OrderStatusTransitionValidator orderStatusTransitionValidator,
+            CouponService couponService,
+            OrderIdempondencyRepository orderIdempondencyRepository,
+            ObjectMapper objectMapper,
+            OutboxEventRepository outboxEventRepository,
+            MeterRegistry meterRegistry
+    ) {
         this.orderRepository = orderRepository;
         this.requestMapper = requestMapper;
         this.userRepository = userRepository;
@@ -112,6 +131,18 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public Page<Order> getOrdersForUser(String emailUser, Pageable pageable) {
+        Page<Order> orders = orderRepository.findByUser_EmailUserIgnoreCase(emailUser, pageable);
+        log.info(
+                "Returning orders page {} with {} element(s) for user {}",
+                orders.getNumber(),
+                orders.getNumberOfElements(),
+                emailUser
+        );
+        return orders;
+    }
+
+    @Override
     public Order updateOrder(Long id, OrderUpdateRequest request) {
         Order existingOrder = orderRepository.findById(id)
                 .orElseThrow(() -> {
@@ -137,47 +168,92 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order with id {} deleted successfully", id);
     }
 
+    @Transactional
+    @Override
+    public Order placeOrder(OrderEnrollmentRequest request, String authenticatedEmail) {
+        return doPlaceOrder(request, authenticatedEmail);
+    }
+
     @Retryable(
             retryFor = ObjectOptimisticLockingFailureException.class,
             backoff = @Backoff(delay = 100, multiplier = 2.0)
     )
     @Transactional
     @Override
-    public Order placeOrder(OrderEnrollmentRequest request) {
+    public Order placeOrder(OrderEnrollmentRequest request, String authenticatedEmail, String idempotencyKey) {
         return orderPlaceTimer.record(() -> {
-            User user = userRepository.findById(request.getIdUser())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getIdUser()));
+            String normalizedIdempotencyKey = idempotencyKey.trim();
+            String currentHash = computeRequestHash(request, authenticatedEmail);
 
-            Device device = deviceRepository.findById(request.getIdDevice())
-                    .orElseThrow(() -> new ResourceNotFoundException("Device not found with id: " + request.getIdDevice()));
+            var existing = orderIdempondencyRepository.findByIdempotencyKey(normalizedIdempotencyKey);
+            if (existing.isPresent()) {
+                Order existingOrder = existing.get().getOrder();
 
-            Integer quantity = request.getQuantityOrder();
-            deviceService.reserveStock(device.getIdDevice(), quantity);
+                if (!existing.get().getRequestHash().equals(currentHash)) {
+                    orderIdempotencyConflictCounter.increment();
+                    throw new IllegalStateException("Idempotency key already used for a different request");
+                }
 
-            Order order = new Order();
-            order.setUser(user);
-            order.setDevice(device);
-            order.setQuantityOrder(quantity);
-            order.setPaymentMethod(request.getPaymentMethod());
-            order.setStatus(OrderStatus.CREATED);
-            order.setPaymentStatus(PaymentStatus.PENDING);
-            order.setOrderDate(LocalDate.now().toString());
-            order.setDeliveryDate(LocalDate.now().plusDays(5).toString());
+                orderIdempotencyHitCounter.increment();
+                return existingOrder;
+            }
 
-            BigDecimal total = MoneyUtils.multiply(device.getDevicePrice(), quantity);
-            order.setTotalPriceOrder(total);
-            order.setDiscountAmount(MoneyUtils.zero());
-            order.setFinalAmount(total);
+            Order created = doPlaceOrder(request, authenticatedEmail);
 
-            Order saved = orderRepository.save(order);
-            writeToOutbox(saved);
+            OrderIdempondency record = new OrderIdempondency();
+            record.setIdempotencyKey(normalizedIdempotencyKey);
+            record.setRequestHash(currentHash);
+            record.setOrder(created);
+            record.setCreatedAt(OffsetDateTime.now());
+            orderIdempondencyRepository.save(record);
 
-            orderPlacedCounter.increment();
-            return saved;
+            return created;
         });
     }
 
-    private Order getOrderOrThrow(Long orderId){
+    private Order doPlaceOrder(OrderEnrollmentRequest request, String authenticatedEmail) {
+        User user = getAuthenticatedUserOrThrow(authenticatedEmail);
+
+        Device device = deviceRepository.findById(request.getIdDevice())
+                .orElseThrow(() -> new ResourceNotFoundException("Device not found with id: " + request.getIdDevice()));
+
+        Integer quantity = request.getQuantityOrder();
+        deviceService.reserveStock(device.getIdDevice(), quantity);
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setDevice(device);
+        order.setQuantityOrder(quantity);
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setStatus(OrderStatus.CREATED);
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setOrderDate(LocalDate.now().toString());
+        order.setDeliveryDate(LocalDate.now().plusDays(5).toString());
+
+        BigDecimal total = MoneyUtils.multiply(device.getDevicePrice(), quantity);
+        order.setTotalPriceOrder(total);
+        order.setDiscountAmount(MoneyUtils.zero());
+        order.setFinalAmount(total);
+
+        Order saved = orderRepository.save(order);
+        writeToOutbox(saved);
+
+        orderPlacedCounter.increment();
+        return saved;
+    }
+
+    private User getAuthenticatedUserOrThrow(String authenticatedEmail) {
+        if (authenticatedEmail == null || authenticatedEmail.isBlank()) {
+            throw new IllegalArgumentException("Authenticated user email is required");
+        }
+
+        return userRepository.findByEmailUserIgnoreCase(authenticatedEmail)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found for authenticated principal: " + authenticatedEmail
+                ));
+    }
+
+    private Order getOrderOrThrow(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> {
                     log.info(ORDER_NOT_FOUND + orderId);
@@ -187,15 +263,15 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public Order updateStatus(Long orderId, OrderStatus newStatus, String reason){
-        if (newStatus.equals(OrderStatus.CANCELED)){
+    public Order updateStatus(Long orderId, OrderStatus newStatus, String reason) {
+        if (newStatus.equals(OrderStatus.CANCELED)) {
             return cancelOrder(orderId, reason);
         }
 
         Order order = getOrderOrThrow(orderId);
         orderStatusTransitionValidator.validateTransition(order.getStatus(), newStatus);
 
-        if (newStatus.equals(OrderStatus.SHIPPED) && !order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)){
+        if (newStatus.equals(OrderStatus.SHIPPED) && !order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
             throw new InvalidOrderStatusTransitionException("Order cannot be shipped without confirmed payment");
         }
 
@@ -205,22 +281,25 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public Order cancelOrder(Long orderId, String reason){
+    public Order cancelOrder(Long orderId, String reason) {
         Order order = getOrderOrThrow(orderId);
-        if (order.getStatus().equals(OrderStatus.CANCELED)){
+        if (order.getStatus().equals(OrderStatus.CANCELED)) {
             return order;
         }
 
-        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)){
-            throw new InvalidOrderStatusTransitionException("Cannot cancel an order that has already been shipped or delivered");
+        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)) {
+            throw new InvalidOrderStatusTransitionException(
+                    "Cannot cancel an order that has already been shipped or delivered"
+            );
         }
 
         order.setStatus(OrderStatus.CANCELED);
-        order.setCanceledReason((reason == null || reason.isBlank()) ? "Order canceled by the user" : reason);
+        order.setCanceledReason(
+                (reason == null || reason.isBlank()) ? "Order canceled by the user" : reason
+        );
 
         deviceService.releaseStock(order.getDevice().getIdDevice(), order.getQuantityOrder());
         return orderRepository.save(order);
-
     }
 
     @Transactional
@@ -232,12 +311,16 @@ public class OrderServiceImpl implements OrderService {
             if (order.getStatus().equals(OrderStatus.SHIPPED)
                     || order.getStatus().equals(OrderStatus.DELIVERED)
                     || order.getStatus().equals(OrderStatus.CANCELED)) {
-                throw new CouponValidationException("Coupon cannot be applied for orders that are in shipped, delivered or canceled status");
+                throw new CouponValidationException(
+                        "Coupon cannot be applied for orders that are in shipped, delivered or canceled status"
+                );
             } else if (order.getCouponCode() != null && !order.getCouponCode().isBlank()) {
                 if (order.getCouponCode().equalsIgnoreCase(couponCode)) {
                     return order;
                 }
-                throw new CouponValidationException("An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode());
+                throw new CouponValidationException(
+                        "An order can have only one coupon applied. Current applied coupon: " + order.getCouponCode()
+                );
             }
 
             BigDecimal orderAmount = MoneyUtils.normalize(order.getTotalPriceOrder());
@@ -252,37 +335,6 @@ public class OrderServiceImpl implements OrderService {
             couponService.registerCouponUsage(couponCode);
             return saved;
         });
-    }
-
-    @Transactional
-    @Override
-    public Order placeOrder(OrderEnrollmentRequest request, String idempotencyKey) {
-        String normalisedIdempotencyKey = idempotencyKey.trim();
-
-        var existing = orderIdempondencyRepository.findByIdempotencyKey(normalisedIdempotencyKey);
-        if (existing.isPresent()){
-            Order existingOrder = existing.get().getOrder();
-
-            String currentHash = computeRequestHash(request);
-            if (!existing.get().getRequestHash().equals(currentHash)){
-                orderIdempotencyConflictCounter.increment();
-                throw new IllegalStateException("Idempotency key already used for a different request");
-            }
-
-            orderIdempotencyHitCounter.increment();
-            return existingOrder;
-        }
-
-        Order created = placeOrder(request);
-        OrderIdempondency record = new OrderIdempondency();
-
-        record.setIdempotencyKey(normalisedIdempotencyKey);
-        record.setRequestHash(computeRequestHash(request));
-        record.setOrder(created);
-        record.setCreatedAt(OffsetDateTime.now());
-        orderIdempondencyRepository.save(record);
-
-        return created;
     }
 
     private void writeToOutbox(Order order) {
@@ -313,14 +365,13 @@ public class OrderServiceImpl implements OrderService {
 
             outboxEventRepository.save(outboxEvent);
             log.info("Outbox event written for orderId={}", order.getIdOrder());
-
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize outbox event for orderId=" + order.getIdOrder(), e);
         }
     }
 
-    private String computeRequestHash(OrderEnrollmentRequest request) {
-        String raw = request.getIdUser() + "|" +
+    private String computeRequestHash(OrderEnrollmentRequest request, String authenticatedEmail) {
+        String raw = authenticatedEmail + "|" +
                 request.getIdDevice() + "|" +
                 request.getQuantityOrder() + "|" +
                 request.getPaymentMethod();
@@ -335,7 +386,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Recover
-    public Order recoverFromOptimisticLock(ObjectOptimisticLockingFailureException ex, OrderEnrollmentRequest request) {
+    public Order recoverFromOptimisticLock(
+            ObjectOptimisticLockingFailureException ex,
+            OrderEnrollmentRequest request,
+            String authenticatedEmail,
+            String idempotencyKey
+    ) {
         orderPlaceConflictCounter.increment();
         throw ex;
     }

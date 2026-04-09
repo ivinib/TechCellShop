@@ -10,10 +10,6 @@ import lombok.Data;
 @Data
 public class OrderEnrollmentRequest {
 
-    @Schema(example = "1", description = "User id who is placing the order")
-    @NotNull(message = "User id is required")
-    private Long idUser;
-
     @Schema(example = "1", description = "Device id being ordered")
     @NotNull(message = "Device id is required")
     private Long idDevice;

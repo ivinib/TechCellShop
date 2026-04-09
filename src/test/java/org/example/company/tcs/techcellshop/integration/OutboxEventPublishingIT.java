@@ -42,19 +42,19 @@ class OutboxEventPublishingIT extends AbstractMultiContainerIT {
     @Autowired private OutboxEventRepository outboxEventRepository;
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "outbox_test@techcellshop.com", roles = "USER")
     @DisplayName("Should persist outbox event before publishing")
     void placeOrder_shouldPersistOutboxBeforePublish() throws Exception {
-        User user = createTestUser("outbox_test@techcellshop.com");
+        createTestUser("outbox_test@techcellshop.com");
         Device device = createTestDevice();
 
         OrderEnrollmentRequest request = new OrderEnrollmentRequest();
-        request.setIdUser(user.getIdUser());
         request.setIdDevice(device.getIdDevice());
         request.setQuantityOrder(1);
         request.setPaymentMethod("PIX");
 
         mockMvc.perform(post("/api/v1/orders")
+                        .header("Idempotency-Key", "outbox-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -67,26 +67,26 @@ class OutboxEventPublishingIT extends AbstractMultiContainerIT {
         assertThat(events)
                 .isNotEmpty()
                 .anySatisfy(event -> {
-                    assertThat(event.getEventType()).isEqualTo("OrderCreated");
+                    assertThat(event.getEventType()).isEqualTo("order.created");
                     assertThat(event.getAggregateType()).isEqualTo("Order");
                     assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
                 });
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "outbox_publish@techcellshop.com", roles = "USER")
     @DisplayName("Should eventually mark event as sent")
     void outboxEvent_shouldBeSentEventually() throws Exception {
-        User user = createTestUser("outbox_publish@techcellshop.com");
+        createTestUser("outbox_publish@techcellshop.com");
         Device device = createTestDevice();
 
         OrderEnrollmentRequest request = new OrderEnrollmentRequest();
-        request.setIdUser(user.getIdUser());
         request.setIdDevice(device.getIdDevice());
         request.setQuantityOrder(1);
         request.setPaymentMethod("PIX");
 
         mockMvc.perform(post("/api/v1/orders")
+                        .header("Idempotency-Key", "outbox-key-2")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -108,7 +108,7 @@ class OutboxEventPublishingIT extends AbstractMultiContainerIT {
     void failedOutboxEvent_shouldBeMarkedAsFailed() {
         OutboxEvent failedEvent = new OutboxEvent();
         failedEvent.setEventId("test-event-" + System.currentTimeMillis());
-        failedEvent.setEventType("OrderCreated");
+        failedEvent.setEventType("order.created");
         failedEvent.setAggregateType("Order");
         failedEvent.setAggregateId(1L);
         failedEvent.setPayload("{\"orderId\": 1}");
@@ -145,13 +145,9 @@ class OutboxEventPublishingIT extends AbstractMultiContainerIT {
         device.setDeviceStorage("256GB");
         device.setDeviceRam("12GB");
         device.setDeviceColor("White");
-        device.setDevicePrice(money("3299.90"));
+        device.setDevicePrice(new BigDecimal("3299.90"));
         device.setDeviceStock(100);
         device.setDeviceCondition("NEW");
         return deviceRepository.save(device);
-    }
-
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
     }
 }

@@ -1,15 +1,17 @@
 package org.example.company.tcs.techcellshop.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.company.tcs.techcellshop.domain.Coupon;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
+import org.example.company.tcs.techcellshop.repository.CouponRepository;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
-import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
+import org.example.company.tcs.techcellshop.util.DiscountType;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -52,7 +55,7 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
     private OrderRepository orderRepository;
 
     @Autowired
-    private OutboxEventRepository outboxEventRepository;
+    private CouponRepository couponRepository;
 
     private User testUser;
     private Device testDevice;
@@ -74,20 +77,19 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
         testDevice.setDeviceStorage("256GB");
         testDevice.setDeviceRam("12GB");
         testDevice.setDeviceColor("Blue");
-        testDevice.setDevicePrice(money("2999.90"));
+        testDevice.setDevicePrice(new BigDecimal("2999.90"));
         testDevice.setDeviceStock(50);
         testDevice.setDeviceCondition("NEW");
         testDevice = deviceRepository.save(testDevice);
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "e2e_test@techcellshop.com", roles = "USER")
     @DisplayName("Should place order successfully")
     void placeOrder_shouldCreateOrder() throws Exception {
         setupTestData();
 
         OrderEnrollmentRequest request = new OrderEnrollmentRequest();
-        request.setIdUser(testUser.getIdUser());
         request.setIdDevice(testDevice.getIdDevice());
         request.setQuantityOrder(2);
         request.setPaymentMethod("PIX");
@@ -103,7 +105,7 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("Should update order status through API")
     void updateOrderStatus_shouldSucceed() throws Exception {
         setupTestData();
@@ -130,7 +132,7 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("Should cancel order successfully")
     void cancelOrder_shouldUpdateStatusAndCreateEvent() throws Exception {
         setupTestData();
@@ -160,10 +162,11 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "e2e_test@techcellshop.com", roles = "USER")
     @DisplayName("Should apply coupon to order")
     void applyCoupon_shouldCalculateDiscount() throws Exception {
         setupTestData();
+        createCoupon("SAVE10", new BigDecimal("10"));
 
         Order order = new Order();
         order.setUser(testUser);
@@ -181,7 +184,17 @@ class OrderEndToEndIT extends AbstractMultiContainerIT {
                 .andExpect(jsonPath("$.couponCode").value("SAVE10"));
     }
 
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
+    private void createCoupon(String code, BigDecimal value) {
+        Coupon coupon = new Coupon();
+        coupon.setCode(code);
+        coupon.setType(DiscountType.PERCENT);
+        coupon.setValue(value);
+        coupon.setActive(true);
+        coupon.setStartsAt(OffsetDateTime.now().minusDays(1));
+        coupon.setEndsAt(OffsetDateTime.now().plusDays(7));
+        coupon.setMinOrderAmount(new BigDecimal("100.00"));
+        coupon.setMaxUses(100);
+        coupon.setUsedCount(0);
+        couponRepository.save(coupon);
     }
 }

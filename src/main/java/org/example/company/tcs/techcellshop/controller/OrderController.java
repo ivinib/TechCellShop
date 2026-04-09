@@ -9,17 +9,19 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
-import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -42,7 +44,7 @@ public class OrderController {
 
     @Operation(
             summary = "Place a new order",
-            description = "Creates an order and triggers the order placement flow",
+            description = "Creates an order for the authenticated user and triggers the order placement flow",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @ApiResponses(value = {
@@ -62,7 +64,6 @@ public class OrderController {
                                     name = "Order payload example",
                                     value = """
                                             {
-                                              "idUser": 1,
                                               "idDevice": 1,
                                               "quantityOrder": 1,
                                               "paymentMethod": "CREDIT_CARD"
@@ -72,8 +73,10 @@ public class OrderController {
                     )
             )
             @RequestBody OrderEnrollmentRequest request,
-            UriComponentsBuilder uriBuilder) {
-        Order savedOrder = orderService.placeOrder(request, idempotencyKey);
+            Authentication authentication,
+            UriComponentsBuilder uriBuilder
+    ) {
+        Order savedOrder = orderService.placeOrder(request, authentication.getName(), idempotencyKey);
         OrderResponse response = responseMapper.toOrderResponse(savedOrder);
 
         URI location = uriBuilder
@@ -88,9 +91,26 @@ public class OrderController {
             summary = "List all orders",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<Page<OrderResponse>> getAllOrders(@PageableDefault(size = 20, sort = "idOrder") Pageable pageable) {
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+            @PageableDefault(size = 20, sort = "idOrder") Pageable pageable
+    ) {
         Page<Order> orders = orderService.getAllOrders(pageable);
+        Page<OrderResponse> response = orders.map(responseMapper::toOrderResponse);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "List orders for the authenticated user",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @GetMapping("/me")
+    public ResponseEntity<Page<OrderResponse>> getMyOrders(
+            Authentication authentication,
+            @PageableDefault(size = 20, sort = "idOrder") Pageable pageable
+    ) {
+        Page<Order> orders = orderService.getOrdersForUser(authentication.getName(), pageable);
         Page<OrderResponse> response = orders.map(responseMapper::toOrderResponse);
         return ResponseEntity.ok(response);
     }
@@ -99,6 +119,7 @@ public class OrderController {
             summary = "Get a specific order using its id",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
         Order order = orderService.getOrderById(id);
@@ -109,6 +130,7 @@ public class OrderController {
             summary = "Update an order",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
         Order updatedOrder = orderService.updateOrder(id, request);
@@ -119,6 +141,7 @@ public class OrderController {
             summary = "Partially update an order",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}")
     public ResponseEntity<OrderResponse> partiallyUpdateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
         Order updatedOrder = orderService.updateOrder(id, request);
@@ -129,33 +152,39 @@ public class OrderController {
             summary = "Delete an order based on its id",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable Long id,
-            @Valid @RequestBody OrderStatusUpdateRequestDto request) {
+            @Valid @RequestBody OrderStatusUpdateRequestDto request
+    ) {
         Order updated = orderService.updateStatus(id, request.getNewStatus(), request.getReason());
         return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
-
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @PostMapping("/{id}/cancel")
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable Long id,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String reason
+    ) {
         Order canceled = orderService.cancelOrder(id, reason);
         return ResponseEntity.ok(responseMapper.toOrderResponse(canceled));
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @PostMapping("/{id}/apply-coupon")
     public ResponseEntity<OrderResponse> applyCoupon(
             @PathVariable Long id,
-            @RequestParam @NotBlank String code) {
+            @RequestParam @NotBlank String code
+    ) {
         Order updated = orderService.applyCoupon(id, code);
         return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
     }

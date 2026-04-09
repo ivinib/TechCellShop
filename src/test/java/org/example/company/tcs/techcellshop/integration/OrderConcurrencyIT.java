@@ -34,7 +34,7 @@ class OrderConcurrencyIT extends AbstractPostgresIT {
     @Autowired private DeviceRepository deviceRepository;
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "ana_it@techcellshop.com", roles = "USER")
     void placeOrder_concurrentRequests_stockOne_onlyOneShouldSucceed() throws Exception {
         User u = new User();
         u.setNameUser("Ana");
@@ -52,55 +52,53 @@ class OrderConcurrencyIT extends AbstractPostgresIT {
         d.setDeviceStorage("128GB");
         d.setDeviceRam("8GB");
         d.setDeviceColor("Black");
-        d.setDevicePrice(money("1000.00"));
+        d.setDevicePrice(new BigDecimal("1000.00"));
         d.setDeviceStock(1);
         d.setDeviceCondition("NEW");
         d = deviceRepository.save(d);
 
         OrderEnrollmentRequest req = new OrderEnrollmentRequest();
-        req.setIdUser(u.getIdUser());
         req.setIdDevice(d.getIdDevice());
         req.setQuantityOrder(1);
         req.setPaymentMethod("PIX");
         String payload = objectMapper.writeValueAsString(req);
 
-        ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Integer>> futures = new ArrayList<>();
 
-        for (int i = 0; i < 2; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
-                return mockMvc.perform(post("/api/v1/orders")
-                                .header("Idempotency-Key", "stock-test-" + ThreadLocalRandom.current().nextInt())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(payload))
-                        .andReturn()
-                        .getResponse()
-                        .getStatus();
-            }));
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            for (int i = 0; i < 2; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return mockMvc.perform(post("/api/v1/orders")
+                                    .header("Idempotency-Key", "stock-test-" + ThreadLocalRandom.current().nextInt())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(payload))
+                            .andReturn()
+                            .getResponse()
+                            .getStatus();
+                }));
+            }
+
+            start.countDown();
+
+            int okOrCreated = 0;
+            int conflictOrBadRequest = 0;
+
+            for (Future<Integer> future : futures) {
+                int status = future.get(20, TimeUnit.SECONDS);
+                if (status == 201 || status == 200) {
+                    okOrCreated++;
+                }
+                if (status == 409 || status == 400) {
+                    conflictOrBadRequest++;
+                }
+            }
+
+            Device reloaded = deviceRepository.findById(d.getIdDevice()).orElseThrow();
+            assertThat(okOrCreated).isEqualTo(1);
+            assertThat(conflictOrBadRequest).isEqualTo(1);
+            assertThat(reloaded.getDeviceStock()).isEqualTo(0);
         }
-
-        start.countDown();
-
-        int okOrCreated = 0;
-        int conflictOrBadRequest = 0;
-
-        for (Future<Integer> f : futures) {
-            int status = f.get(20, TimeUnit.SECONDS);
-            if (status == 201 || status == 200) okOrCreated++;
-            if (status == 409 || status == 400) conflictOrBadRequest++;
-        }
-
-        pool.shutdownNow();
-
-        Device reloaded = deviceRepository.findById(d.getIdDevice()).orElseThrow();
-        assertThat(okOrCreated).isEqualTo(1);
-        assertThat(conflictOrBadRequest).isEqualTo(1);
-        assertThat(reloaded.getDeviceStock()).isEqualTo(0);
-    }
-
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
     }
 }

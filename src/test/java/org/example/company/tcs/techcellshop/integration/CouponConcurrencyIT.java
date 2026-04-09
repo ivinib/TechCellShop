@@ -40,7 +40,7 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
     @Autowired private CouponRepository couponRepository;
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "ana_coupon_it@techcellshop.com", roles = "USER")
     void applyCoupon_concurrentRequests_maxUsesOne_onlyOneShouldSucceed() throws Exception {
         User user = new User();
         user.setNameUser("Ana Coupon");
@@ -58,7 +58,7 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
         device.setDeviceStorage("128GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(money("1000.00"));
+        device.setDevicePrice(new BigDecimal("1000.00"));
         device.setDeviceStock(5);
         device.setDeviceCondition("NEW");
         device = deviceRepository.save(device);
@@ -73,63 +73,58 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
         coupon.setMinOrderAmount(new BigDecimal("100"));
         coupon.setMaxUses(1);
         coupon.setUsedCount(0);
-        coupon = couponRepository.save(coupon);
+        couponRepository.save(coupon);
 
-        Long orderId1 = createOrder(user.getIdUser(), device.getIdDevice(), "coupon-key-1");
-        Long orderId2 = createOrder(user.getIdUser(), device.getIdDevice(), "coupon-key-2");
+        Long orderId1 = createOrder(device.getIdDevice(), "coupon-key-1");
+        Long orderId2 = createOrder(device.getIdDevice(), "coupon-key-2");
 
-        ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Integer>> futures = new ArrayList<>();
 
-        Long finalOrderId1 = orderId1;
-        Long finalOrderId2 = orderId2;
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            futures.add(pool.submit(() -> {
+                start.await();
+                return mockMvc.perform(post("/api/v1/orders/" + orderId1 + "/apply-coupon")
+                                .param("code", "OFF10"))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus();
+            }));
 
-        futures.add(pool.submit(() -> {
-            start.await();
-            return mockMvc.perform(post("/api/v1/orders/" + finalOrderId1 + "/apply-coupon")
-                            .param("code", "OFF10"))
-                    .andReturn()
-                    .getResponse()
-                    .getStatus();
-        }));
+            futures.add(pool.submit(() -> {
+                start.await();
+                return mockMvc.perform(post("/api/v1/orders/" + orderId2 + "/apply-coupon")
+                                .param("code", "OFF10"))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus();
+            }));
 
-        futures.add(pool.submit(() -> {
-            start.await();
-            return mockMvc.perform(post("/api/v1/orders/" + finalOrderId2 + "/apply-coupon")
-                            .param("code", "OFF10"))
-                    .andReturn()
-                    .getResponse()
-                    .getStatus();
-        }));
+            start.countDown();
 
-        start.countDown();
+            int successCount = 0;
+            int conflictCount = 0;
 
-        int successCount = 0;
-        int conflictCount = 0;
-
-        for (Future<Integer> future : futures) {
-            int status = future.get(20, TimeUnit.SECONDS);
-            if (status == 200) {
-                successCount++;
+            for (Future<Integer> future : futures) {
+                int status = future.get(20, TimeUnit.SECONDS);
+                if (status == 200) {
+                    successCount++;
+                }
+                if (status == 409) {
+                    conflictCount++;
+                }
             }
-            if (status == 409) {
-                conflictCount++;
-            }
+
+            Coupon reloaded = couponRepository.findByCodeIgnoreCase("OFF10").orElseThrow();
+
+            assertThat(successCount).isEqualTo(1);
+            assertThat(conflictCount).isEqualTo(1);
+            assertThat(reloaded.getUsedCount()).isEqualTo(1);
         }
-
-        pool.shutdownNow();
-
-        Coupon reloaded = couponRepository.findByCodeIgnoreCase("OFF10").orElseThrow();
-
-        assertThat(successCount).isEqualTo(1);
-        assertThat(conflictCount).isEqualTo(1);
-        assertThat(reloaded.getUsedCount()).isEqualTo(1);
     }
 
-    private Long createOrder(Long userId, Long deviceId, String idempotencyKey) throws Exception {
+    private Long createOrder(Long deviceId, String idempotencyKey) throws Exception {
         OrderEnrollmentRequest request = new OrderEnrollmentRequest();
-        request.setIdUser(userId);
         request.setIdDevice(deviceId);
         request.setQuantityOrder(1);
         request.setPaymentMethod("PIX");
@@ -144,9 +139,5 @@ class CouponConcurrencyIT extends AbstractPostgresIT {
 
         JsonNode json = objectMapper.readTree(response);
         return json.get("idOrder").asLong();
-    }
-
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
     }
 }

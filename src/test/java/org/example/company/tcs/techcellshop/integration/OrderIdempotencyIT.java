@@ -2,9 +2,9 @@ package org.example.company.tcs.techcellshop.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.User;
+import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.repository.DeviceRepository;
 import org.example.company.tcs.techcellshop.repository.OrderIdempondencyRepository;
 import org.example.company.tcs.techcellshop.repository.OrderRepository;
@@ -39,7 +39,7 @@ class OrderIdempotencyIT extends AbstractPostgresIT {
     @Autowired private OrderIdempondencyRepository orderIdempondencyRepository;
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "ana_idem_it@techcellshop.com", roles = "USER")
     void placeOrder_sameIdempotencyKey_concurrentRequests_shouldReturnSameOrder() throws Exception {
         User user = new User();
         user.setNameUser("Ana Idempotency");
@@ -57,13 +57,12 @@ class OrderIdempotencyIT extends AbstractPostgresIT {
         device.setDeviceStorage("128GB");
         device.setDeviceRam("8GB");
         device.setDeviceColor("Black");
-        device.setDevicePrice(money("1200.00"));
+        device.setDevicePrice(new BigDecimal("1200.00"));
         device.setDeviceStock(10);
         device.setDeviceCondition("NEW");
         device = deviceRepository.save(device);
 
         OrderEnrollmentRequest request = new OrderEnrollmentRequest();
-        request.setIdUser(user.getIdUser());
         request.setIdDevice(device.getIdDevice());
         request.setQuantityOrder(1);
         request.setPaymentMethod("PIX");
@@ -71,40 +70,35 @@ class OrderIdempotencyIT extends AbstractPostgresIT {
         String payload = objectMapper.writeValueAsString(request);
         String sameKey = "same-idempotency-key";
 
-        ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Long>> futures = new ArrayList<>();
 
-        for (int i = 0; i < 2; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            for (int i = 0; i < 2; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
 
-                String responseBody = mockMvc.perform(post("/api/v1/orders")
-                                .header("Idempotency-Key", sameKey)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(payload))
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
+                    String responseBody = mockMvc.perform(post("/api/v1/orders")
+                                    .header("Idempotency-Key", sameKey)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(payload))
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
 
-                JsonNode json = objectMapper.readTree(responseBody);
-                return json.get("idOrder").asLong();
-            }));
+                    JsonNode json = objectMapper.readTree(responseBody);
+                    return json.get("idOrder").asLong();
+                }));
+            }
+
+            start.countDown();
+
+            Long id1 = futures.get(0).get(20, TimeUnit.SECONDS);
+            Long id2 = futures.get(1).get(20, TimeUnit.SECONDS);
+
+            assertThat(id1).isEqualTo(id2);
+            assertThat(orderRepository.count()).isEqualTo(1);
+            assertThat(orderIdempondencyRepository.findByIdempotencyKey(sameKey)).isPresent();
         }
-
-        start.countDown();
-
-        Long id1 = futures.get(0).get(20, TimeUnit.SECONDS);
-        Long id2 = futures.get(1).get(20, TimeUnit.SECONDS);
-
-        pool.shutdownNow();
-
-        assertThat(id1).isEqualTo(id2);
-        assertThat(orderRepository.count()).isEqualTo(1);
-        assertThat(orderIdempondencyRepository.findByIdempotencyKey(sameKey)).isPresent();
-    }
-
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
     }
 }
