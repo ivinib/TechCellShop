@@ -4,60 +4,68 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationRequestDto;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
+import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
+import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
+import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
+import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
 import org.example.company.tcs.techcellshop.service.CouponService;
+import org.example.company.tcs.techcellshop.service.JwtService;
 import org.example.company.tcs.techcellshop.util.TraceIdFilter;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-@SpringBootTest
-@Import(SecurityConfig.class)
+@WebMvcTest(CouponController.class)
+@Import({
+        SecurityConfig.class,
+        GlobalExceptionHandler.class,
+        TraceIdFilter.class,
+        JwtAuthenticationFilter.class,
+        RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class
+})
 @DisplayName("CouponController")
 class CouponControllerTest {
 
+    @Autowired
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    private WebApplicationContext context;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private CouponService couponService;
 
-    private CouponValidationRequestDto validRequest;
+    @MockitoBean
+    private JwtService jwtService;
 
-    @BeforeEach
-    void setUp() {
-        this.mockMvc = webAppContextSetup(context)
-                .addFilters(context.getBean(TraceIdFilter.class))
-                .apply(springSecurity())
-                .build();
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
-        validRequest = new CouponValidationRequestDto();
-        validRequest.setCode("WELCOME10");
-        validRequest.setOrderAmount(new BigDecimal("3999.90"));
+    private CouponValidationRequestDto validRequest() {
+        CouponValidationRequestDto request = new CouponValidationRequestDto();
+        request.setCode("WELCOME10");
+        request.setOrderAmount(new BigDecimal("3999.90"));
+        return request;
     }
 
     @Test
     @WithMockUser
-    @DisplayName("POST /coupons/validate should return 200 when valid")
+    @DisplayName("POST /api/v1/coupons/validate should return 200 when valid")
     void validate_shouldReturn200_whenValid() throws Exception {
         CouponValidationResponseDto response = new CouponValidationResponseDto();
         response.setValid(true);
@@ -69,7 +77,7 @@ class CouponControllerTest {
 
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.discountAmount").value(399.99));
@@ -77,37 +85,43 @@ class CouponControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("POST /coupons/validate should return 400 when code is blank")
+    @DisplayName("POST /api/v1/coupons/validate should return 400 when code is blank")
     void validate_shouldReturn400_whenCodeBlank() throws Exception {
-        validRequest.setCode(" ");
+        CouponValidationRequestDto request = validRequest();
+        request.setCode(" ");
 
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.validationErrors.code").exists());
     }
 
     @Test
     @WithMockUser
-    @DisplayName("POST /coupons/validate should return 400 when amount is invalid")
+    @DisplayName("POST /api/v1/coupons/validate should return 400 when amount is invalid")
     void validate_shouldReturn400_whenAmountInvalid() throws Exception {
-        validRequest.setOrderAmount(new BigDecimal("0.00"));
+        CouponValidationRequestDto request = validRequest();
+        request.setOrderAmount(new BigDecimal("0.00"));
 
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.validationErrors.orderAmount").exists());
     }
 
     @Test
-    @DisplayName("POST /coupons/validate should require authentication")
+    @DisplayName("POST /api/v1/coupons/validate should require authentication")
     void validate_shouldReject_whenUnauthenticated() throws Exception {
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .header("X-Trace-Id", "test-trace-id")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.error").value("Unauthorized"))
@@ -118,12 +132,15 @@ class CouponControllerTest {
     @Test
     @WithMockUser
     void validate_shouldReturn400_whenAmountHasMoreThanTwoDecimalPlaces() throws Exception {
-        validRequest.setOrderAmount(new BigDecimal("3999.999"));
+        CouponValidationRequestDto request = validRequest();
+        request.setOrderAmount(new BigDecimal("3999.999"));
 
         mockMvc.perform(post("/api/v1/coupons/validate")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.validationErrors.orderAmount").exists());
     }
 }

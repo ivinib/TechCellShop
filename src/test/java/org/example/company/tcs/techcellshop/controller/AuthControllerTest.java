@@ -3,12 +3,17 @@ package org.example.company.tcs.techcellshop.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.dto.request.AuthRequest;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
+import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
+import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
+import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
+import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
 import org.example.company.tcs.techcellshop.service.JwtService;
-import org.junit.jupiter.api.BeforeEach;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,27 +22,31 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-@SpringBootTest
-@Import(SecurityConfig.class)
+@WebMvcTest(AuthController.class)
+@Import({
+        SecurityConfig.class,
+        GlobalExceptionHandler.class,
+        TraceIdFilter.class,
+        JwtAuthenticationFilter.class,
+        RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class
+})
 @DisplayName("AuthController")
 class AuthControllerTest {
 
+    @Autowired
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    private WebApplicationContext context;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private AuthenticationManager authenticationManager;
@@ -45,12 +54,8 @@ class AuthControllerTest {
     @MockitoBean
     private JwtService jwtService;
 
-    @BeforeEach
-    void setUp() {
-        this.mockMvc = webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
-    }
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
     @Test
     @DisplayName("POST /api/v1/auth/login should return 200 with token when credentials are valid")
@@ -90,6 +95,7 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("Validation failed"))
                 .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
                 .andExpect(jsonPath("$.validationErrors.email").exists());
@@ -109,6 +115,11 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
                 .andExpect(jsonPath("$.validationErrors.password").exists());
     }
 }

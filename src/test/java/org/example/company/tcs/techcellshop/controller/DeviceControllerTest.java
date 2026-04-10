@@ -6,17 +6,22 @@ import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.dto.request.DeviceEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.DeviceResponse;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.RequestMapper;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
+import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
+import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
+import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
+import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
 import org.example.company.tcs.techcellshop.service.DeviceService;
+import org.example.company.tcs.techcellshop.service.JwtService;
 import org.example.company.tcs.techcellshop.util.TraceIdFilter;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,7 +31,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -37,7 +41,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -46,18 +49,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-@SpringBootTest
-@Import(SecurityConfig.class)
+@WebMvcTest(DeviceController.class)
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, TraceIdFilter.class})
 @DisplayName("DeviceController")
 class DeviceControllerTest {
 
+    @Autowired
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    private WebApplicationContext context;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private DeviceService deviceService;
@@ -68,55 +70,76 @@ class DeviceControllerTest {
     @MockitoBean
     private ResponseMapper responseMapper;
 
-    private DeviceEnrollmentRequest validRequest;
-    private DeviceUpdateRequest validUpdateRequest;
-    private Device mockDevice;
-    private DeviceResponse mockDeviceResponse;
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
-    @BeforeEach
-    void setUp() {
-        this.mockMvc = webAppContextSetup(context)
-                .addFilters(context.getBean(TraceIdFilter.class))
-                .apply(springSecurity())
-                .build();
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-        validRequest = new DeviceEnrollmentRequest();
-        validRequest.setNameDevice("Galaxy S24");
-        validRequest.setDescriptionDevice("Samsung smartphone 256GB");
-        validRequest.setDeviceType("SMARTPHONE");
-        validRequest.setDeviceStorage("256GB");
-        validRequest.setDeviceRam("8GB");
-        validRequest.setDeviceColor("Black");
-        validRequest.setDevicePrice(money("3999.90"));
-        validRequest.setDeviceStock(10);
-        validRequest.setDeviceCondition("NEW");
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
-        validUpdateRequest = new DeviceUpdateRequest();
-        validUpdateRequest.setNameDevice("Galaxy S24");
-        validUpdateRequest.setDescriptionDevice("Samsung smartphone 256GB");
-        validUpdateRequest.setDeviceType("SMARTPHONE");
-        validUpdateRequest.setDeviceStorage("256GB");
-        validUpdateRequest.setDeviceRam("8GB");
-        validUpdateRequest.setDeviceColor("Black");
-        validUpdateRequest.setDevicePrice(money("3999.90"));
-        validUpdateRequest.setDeviceStock(10);
-        validUpdateRequest.setDeviceCondition("NEW");
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
 
-        mockDevice = new Device();
-        mockDevice.setIdDevice(1L);
-        mockDevice.setNameDevice("Galaxy S24");
-        mockDevice.setDescriptionDevice("Samsung smartphone 256GB");
-        mockDevice.setDeviceType("SMARTPHONE");
-        mockDevice.setDeviceStorage("256GB");
-        mockDevice.setDeviceRam("8GB");
-        mockDevice.setDeviceColor("Black");
-        mockDevice.setDevicePrice(money("3999.90"));
-        mockDevice.setDeviceStock(10);
-        mockDevice.setDeviceCondition("NEW");
+    @MockitoBean
+    private JwtService jwtService;
 
-        mockDeviceResponse = new DeviceResponse(
-                1L, "Galaxy S24", "Samsung smartphone 256GB", "SMARTPHONE",
-                "256GB", "8GB", "Black", money("3999.90"), 10, "NEW"
+    private DeviceEnrollmentRequest validRequest() {
+        DeviceEnrollmentRequest request = new DeviceEnrollmentRequest();
+        request.setNameDevice("Galaxy S24");
+        request.setDescriptionDevice("Samsung smartphone 256GB");
+        request.setDeviceType("SMARTPHONE");
+        request.setDeviceStorage("256GB");
+        request.setDeviceRam("8GB");
+        request.setDeviceColor("Black");
+        request.setDevicePrice(money("3999.90"));
+        request.setDeviceStock(10);
+        request.setDeviceCondition("NEW");
+        return request;
+    }
+
+    private DeviceUpdateRequest validUpdateRequest() {
+        DeviceUpdateRequest request = new DeviceUpdateRequest();
+        request.setNameDevice("Galaxy S24");
+        request.setDescriptionDevice("Samsung smartphone 256GB");
+        request.setDeviceType("SMARTPHONE");
+        request.setDeviceStorage("256GB");
+        request.setDeviceRam("8GB");
+        request.setDeviceColor("Black");
+        request.setDevicePrice(money("3999.90"));
+        request.setDeviceStock(10);
+        request.setDeviceCondition("NEW");
+        return request;
+    }
+
+    private Device mockDevice() {
+        Device device = new Device();
+        device.setIdDevice(1L);
+        device.setNameDevice("Galaxy S24");
+        device.setDescriptionDevice("Samsung smartphone 256GB");
+        device.setDeviceType("SMARTPHONE");
+        device.setDeviceStorage("256GB");
+        device.setDeviceRam("8GB");
+        device.setDeviceColor("Black");
+        device.setDevicePrice(money("3999.90"));
+        device.setDeviceStock(10);
+        device.setDeviceCondition("NEW");
+        return device;
+    }
+
+    private DeviceResponse mockDeviceResponse() {
+        return new DeviceResponse(
+                1L,
+                "Galaxy S24",
+                "Samsung smartphone 256GB",
+                "SMARTPHONE",
+                "256GB",
+                "8GB",
+                "Black",
+                money("3999.90"),
+                10,
+                "NEW"
         );
     }
 
@@ -128,13 +151,16 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 201 when request is valid")
         void shouldReturn201_whenRequestIsValid() throws Exception {
-            when(requestMapper.toDevice(any())).thenReturn(mockDevice);
-            when(deviceService.saveDevice(any())).thenReturn(mockDevice);
-            when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
+            Device device = mockDevice();
+            DeviceResponse response = mockDeviceResponse();
+
+            when(requestMapper.toDevice(any(DeviceEnrollmentRequest.class))).thenReturn(device);
+            when(deviceService.saveDevice(any(Device.class))).thenReturn(device);
+            when(responseMapper.toDeviceResponse(any(Device.class))).thenReturn(response);
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(validRequest())))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", containsString("/api/v1/devices/1")))
                     .andExpect(jsonPath("$.idDevice").value(1L))
@@ -145,11 +171,12 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when device type is invalid")
         void shouldReturn400_whenDeviceTypeIsInvalid() throws Exception {
-            validRequest.setDeviceType("PHONE");
+            DeviceEnrollmentRequest request = validRequest();
+            request.setDeviceType("PHONE");
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.validationErrors.deviceType").exists());
         }
@@ -158,11 +185,12 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when storage format is invalid")
         void shouldReturn400_whenStorageFormatIsInvalid() throws Exception {
-            validRequest.setDeviceStorage("256");
+            DeviceEnrollmentRequest request = validRequest();
+            request.setDeviceStorage("256");
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.validationErrors.deviceStorage").exists());
         }
@@ -171,11 +199,12 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when price is negative")
         void shouldReturn400_whenPriceIsNegative() throws Exception {
-            validRequest.setDevicePrice(money("-1.00"));
+            DeviceEnrollmentRequest request = validRequest();
+            request.setDevicePrice(money("-1.00"));
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.validationErrors.devicePrice").exists());
         }
@@ -184,11 +213,12 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 400 when condition is invalid")
         void shouldReturn400_whenConditionIsInvalid() throws Exception {
-            validRequest.setDeviceCondition("OLD");
+            DeviceEnrollmentRequest request = validRequest();
+            request.setDeviceCondition("OLD");
 
             mockMvc.perform(post("/api/v1/devices")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.validationErrors.deviceCondition").exists());
         }
@@ -199,7 +229,7 @@ class DeviceControllerTest {
             mockMvc.perform(post("/api/v1/devices")
                             .header("X-Trace-Id", "test-trace-id")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest)))
+                            .content(objectMapper.writeValueAsString(validRequest())))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.error").value("Unauthorized"))
@@ -216,10 +246,10 @@ class DeviceControllerTest {
         @WithMockUser
         @DisplayName("Should return 200 with device list when authenticated")
         void shouldReturn200_withDeviceList_whenAuthenticated() throws Exception {
-            Page<Device> devicesPage = new PageImpl<>(List.of(mockDevice), PageRequest.of(0, 20), 1);
+            Page<Device> devicesPage = new PageImpl<>(List.of(mockDevice()), PageRequest.of(0, 20), 1);
 
             when(deviceService.getAllDevices(any(Pageable.class))).thenReturn(devicesPage);
-            when(responseMapper.toDeviceResponse(mockDevice)).thenReturn(mockDeviceResponse);
+            when(responseMapper.toDeviceResponse(any(Device.class))).thenReturn(mockDeviceResponse());
 
             mockMvc.perform(get("/api/v1/devices")
                             .param("page", "0")
@@ -266,8 +296,8 @@ class DeviceControllerTest {
         @WithMockUser
         @DisplayName("Should return 200 when device is found")
         void shouldReturn200_whenDeviceIsFound() throws Exception {
-            when(deviceService.getDeviceById(1L)).thenReturn(mockDevice);
-            when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
+            when(deviceService.getDeviceById(1L)).thenReturn(mockDevice());
+            when(responseMapper.toDeviceResponse(any(Device.class))).thenReturn(mockDeviceResponse());
 
             mockMvc.perform(get("/api/v1/devices/1"))
                     .andExpect(status().isOk())
@@ -303,15 +333,24 @@ class DeviceControllerTest {
         @DisplayName("Should return 200 when device is updated")
         void shouldReturn200_whenDeviceIsUpdated() throws Exception {
             DeviceResponse updatedResponse = new DeviceResponse(
-                    1L, "Galaxy S24 Ultra", "Samsung smartphone 512GB", "SMARTPHONE",
-                    "512GB", "12GB", "Black", money("4999.90"), 8, "NEW"
+                    1L,
+                    "Galaxy S24 Ultra",
+                    "Samsung smartphone 512GB",
+                    "SMARTPHONE",
+                    "512GB",
+                    "12GB",
+                    "Black",
+                    money("4999.90"),
+                    8,
+                    "NEW"
             );
-            when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
-            when(responseMapper.toDeviceResponse(any())).thenReturn(updatedResponse);
+
+            when(deviceService.updateDevice(eq(1L), any(DeviceUpdateRequest.class))).thenReturn(mockDevice());
+            when(responseMapper.toDeviceResponse(any(Device.class))).thenReturn(updatedResponse);
 
             mockMvc.perform(put("/api/v1/devices/1")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.nameDevice").value("Galaxy S24 Ultra"))
                     .andExpect(jsonPath("$.devicePrice").value(4999.90));
@@ -321,13 +360,13 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 404 when device is not found")
         void shouldReturn404_whenDeviceIsNotFound() throws Exception {
-            when(deviceService.updateDevice(eq(99L), any()))
+            when(deviceService.updateDevice(eq(99L), any(DeviceUpdateRequest.class)))
                     .thenThrow(new ResourceNotFoundException("Device not found with id: 99"));
 
             mockMvc.perform(put("/api/v1/devices/99")
                             .header("X-Trace-Id", "test-trace-id")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest())))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404))
                     .andExpect(jsonPath("$.error").value("Not Found"))
@@ -346,12 +385,12 @@ class DeviceControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("Should return 200 when device is partially updated")
         void shouldReturn200_whenDeviceIsPartiallyUpdated() throws Exception {
-            when(deviceService.updateDevice(eq(1L), any())).thenReturn(mockDevice);
-            when(responseMapper.toDeviceResponse(any())).thenReturn(mockDeviceResponse);
+            when(deviceService.updateDevice(eq(1L), any(DeviceUpdateRequest.class))).thenReturn(mockDevice());
+            when(responseMapper.toDeviceResponse(any(Device.class))).thenReturn(mockDeviceResponse());
 
             mockMvc.perform(patch("/api/v1/devices/1")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                            .content(objectMapper.writeValueAsString(validUpdateRequest())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.idDevice").value(1L));
         }
@@ -393,11 +432,12 @@ class DeviceControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void shouldReturn400_whenPriceHasMoreThanTwoDecimalPlaces() throws Exception {
-        validRequest.setDevicePrice(new BigDecimal("3999.999"));
+        DeviceEnrollmentRequest request = validRequest();
+        request.setDevicePrice(new BigDecimal("3999.999"));
 
         mockMvc.perform(post("/api/v1/devices")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.validationErrors.devicePrice").exists());
     }

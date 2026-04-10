@@ -9,9 +9,16 @@ import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
 import org.example.company.tcs.techcellshop.dto.response.DeviceSummaryResponse;
 import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
 import org.example.company.tcs.techcellshop.dto.response.UserSummaryResponse;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
 import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
 import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
+import org.example.company.tcs.techcellshop.security.AccessPolicy;
+import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
+import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
+import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
+import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
+import org.example.company.tcs.techcellshop.service.JwtService;
 import org.example.company.tcs.techcellshop.service.OrderService;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
@@ -21,7 +28,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -31,7 +38,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -42,7 +48,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -51,24 +56,38 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-@SpringBootTest
-@Import({SecurityConfig.class})
-@DisplayName("OrderController")
+@WebMvcTest(OrderController.class)
+@Import({
+        SecurityConfig.class,
+        GlobalExceptionHandler.class,
+        TraceIdFilter.class,
+        JwtAuthenticationFilter.class,
+        RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class
+})
 class OrderControllerTest {
 
+    @Autowired
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    private WebApplicationContext context;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private OrderService orderService;
 
     @MockitoBean
     private ResponseMapper responseMapper;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
+
+    @MockitoBean
+    private JwtService jwtService;
+
+    @MockitoBean
+    private AccessPolicy accessPolicy;
 
     private OrderEnrollmentRequest validEnrollmentRequest;
     private OrderUpdateRequest validUpdateRequest;
@@ -78,11 +97,6 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = webAppContextSetup(context)
-                .addFilters(context.getBean(TraceIdFilter.class))
-                .apply(springSecurity())
-                .build();
-
         validEnrollmentRequest = new OrderEnrollmentRequest();
         validEnrollmentRequest.setIdDevice(1L);
         validEnrollmentRequest.setQuantityOrder(1);
