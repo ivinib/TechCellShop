@@ -1,7 +1,7 @@
 package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
@@ -59,12 +59,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(OrderController.class)
 @Import({
-        SecurityConfig.class,
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        JwtAuthenticationFilter.class,
-        RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class
+        SecurityWebMvcTestConfig.class
 })
 class OrderControllerTest {
 
@@ -88,6 +85,15 @@ class OrderControllerTest {
 
     @MockitoBean
     private AccessPolicy accessPolicy;
+
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
 
     private OrderEnrollmentRequest validEnrollmentRequest;
     private OrderUpdateRequest validUpdateRequest;

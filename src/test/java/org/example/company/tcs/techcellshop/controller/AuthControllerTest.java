@@ -1,7 +1,7 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.request.AuthRequest;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
 import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
@@ -22,6 +22,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -32,14 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AuthController.class)
 @Import({
-        SecurityConfig.class,
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        JwtAuthenticationFilter.class,
-        RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class
+        SecurityWebMvcTestConfig.class
 })
-@DisplayName("AuthController")
 class AuthControllerTest {
 
     @Autowired
@@ -56,6 +53,15 @@ class AuthControllerTest {
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
+
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
 
     @Test
     @DisplayName("POST /api/v1/auth/login should return 200 with token when credentials are valid")

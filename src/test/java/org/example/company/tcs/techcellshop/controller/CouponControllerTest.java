@@ -1,7 +1,6 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationRequestDto;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
@@ -21,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 
@@ -31,14 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CouponController.class)
 @Import({
-        SecurityConfig.class,
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        JwtAuthenticationFilter.class,
-        RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class
+        SecurityWebMvcTestConfig.class
 })
-@DisplayName("CouponController")
 class CouponControllerTest {
 
     @Autowired
@@ -55,6 +51,15 @@ class CouponControllerTest {
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
+
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
 
     private CouponValidationRequestDto validRequest() {
         CouponValidationRequestDto request = new CouponValidationRequestDto();

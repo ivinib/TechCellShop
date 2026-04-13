@@ -2,7 +2,7 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.JwtException;
-import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
@@ -36,12 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(PaymentController.class)
 @Import({
-        SecurityConfig.class,
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        JwtAuthenticationFilter.class,
-        RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class
+        SecurityWebMvcTestConfig.class
 })
 @DisplayName("PaymentController")
 class PaymentControllerTest {
@@ -56,10 +53,19 @@ class PaymentControllerTest {
     private PaymentService paymentService;
 
     @MockitoBean
-    private JwtService jwtService;
+    private CustomUserDetailsService customUserDetailsService;
 
     @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
+
+    @MockitoBean
+    private JwtService jwtService;
 
     private PaymentActionRequestDto validRequest() {
         PaymentActionRequestDto request = new PaymentActionRequestDto();

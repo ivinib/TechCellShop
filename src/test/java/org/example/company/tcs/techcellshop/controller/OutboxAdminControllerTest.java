@@ -1,13 +1,15 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.OutboxEventResponseDto;
 import org.example.company.tcs.techcellshop.dto.RequeueResultDto;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
 import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
 import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
 import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
 import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
 import org.example.company.tcs.techcellshop.service.OutboxAdminService;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -28,7 +30,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OutboxAdminController.class)
-@Import(SecurityConfig.class)
+@Import({
+        SecurityWebMvcTestConfig.class,
+        GlobalExceptionHandler.class,
+        TraceIdFilter.class
+})
 class OutboxAdminControllerTest {
 
     @Autowired

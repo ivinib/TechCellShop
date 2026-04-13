@@ -2,6 +2,7 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.company.tcs.techcellshop.config.SecurityConfig;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.domain.User;
 import org.example.company.tcs.techcellshop.dto.request.UserEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.UserUpdateRequest;
@@ -50,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, TraceIdFilter.class})
+@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityWebMvcTestConfig.class})
 @DisplayName("UserController")
 class UserControllerTest {
 
