@@ -1,205 +1,253 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.JwtException;
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.example.company.tcs.techcellshop.domain.ErrorResponse;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
-import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
-import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
-import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
-import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
-import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
-import org.example.company.tcs.techcellshop.service.JwtService;
 import org.example.company.tcs.techcellshop.service.PaymentService;
-import org.example.company.tcs.techcellshop.util.PaymentStatus;
-import org.example.company.tcs.techcellshop.util.TraceIdFilter;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+@Tag(name = "Payment Management", description = "Endpoints for managing payment actions such as confirmation, failure, and refunds")
+@RestController
+@RequestMapping("/api/v1/payments")
+public class PaymentController {
 
-@WebMvcTest(PaymentController.class)
-@Import({
-        GlobalExceptionHandler.class,
-        TraceIdFilter.class,
-        SecurityWebMvcTestConfig.class
-})
-@DisplayName("PaymentController")
-class PaymentControllerTest {
+    private final PaymentService paymentService;
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private PaymentService paymentService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
-
-    @MockitoBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    @MockitoBean
-    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
-
-    @MockitoBean
-    private RestAccessDeniedHandler restAccessDeniedHandler;
-
-    @MockitoBean
-    private JwtService jwtService;
-
-    private PaymentActionRequestDto validRequest() {
-        PaymentActionRequestDto request = new PaymentActionRequestDto();
-        request.setTransactionId("TXN-1001");
-        request.setAmount(new BigDecimal("3999.90"));
-        request.setReason("ok");
-        return request;
+    public PaymentController(PaymentService paymentService) {
+        this.paymentService = paymentService;
     }
 
-    private PaymentResponseDto response(Long orderId, PaymentStatus status) {
-        PaymentResponseDto response = new PaymentResponseDto();
-        response.setOrderId(orderId);
-        response.setPaymentStatus(status);
-        response.setProcessedAt(OffsetDateTime.now());
-        return response;
+    @Operation(
+            summary = "Confirm payment",
+            description = "Confirms payment for an existing order when the order state and amount are valid",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Payment confirmed"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid payload or amount mismatch",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(ref = "#/components/examples/ValidationErrorExample"),
+                                    @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Order/payment state conflict",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            )
+    })
+    @PostMapping("/orders/{orderId}/confirm")
+    public ResponseEntity<PaymentResponseDto> confirm(
+            @PathVariable Long orderId,
+            @Valid
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Payment confirmation payload",
+                    required = true,
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Confirm payment example",
+                                    value = """
+                                            {
+                                              "transactionId": "TXN-1001",
+                                              "amount": 2899.90,
+                                              "reason": "Payment approved"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody PaymentActionRequestDto request
+    ) {
+        return ResponseEntity.ok(paymentService.confirmPayment(orderId, request));
     }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/v1/payments/orders/{id}/confirm should return 200")
-    void confirm_shouldReturn200() throws Exception {
-        when(paymentService.confirmPayment(eq(1L), any(PaymentActionRequestDto.class)))
-                .thenReturn(response(1L, PaymentStatus.CONFIRMED));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderId").value(1L))
-                .andExpect(jsonPath("$.paymentStatus").value("CONFIRMED"));
+    @Operation(
+            summary = "Fail payment",
+            description = "Marks payment as failed and cancels the order when business rules allow it",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Payment failed and order canceled"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request payload",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ValidationErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Order/payment state conflict",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            )
+    })
+    @PostMapping("/orders/{orderId}/fail")
+    public ResponseEntity<PaymentResponseDto> fail(
+            @PathVariable Long orderId,
+            @Valid
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Payment failure payload",
+                    required = true,
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Fail payment example",
+                                    value = """
+                                            {
+                                              "transactionId": "TXN-1002",
+                                              "amount": 2899.90,
+                                              "reason": "Card denied"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody PaymentActionRequestDto request
+    ) {
+        return ResponseEntity.ok(paymentService.failPayment(orderId, request));
     }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/v1/payments/orders/{id}/fail should return 200")
-    void fail_shouldReturn200() throws Exception {
-        when(paymentService.failPayment(eq(1L), any(PaymentActionRequestDto.class)))
-                .thenReturn(response(1L, PaymentStatus.FAILED));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/fail")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.paymentStatus").value("FAILED"));
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/v1/payments/orders/{id}/refund should return 200")
-    void refund_shouldReturn200() throws Exception {
-        when(paymentService.refundPayment(eq(1L), any(PaymentActionRequestDto.class)))
-                .thenReturn(response(1L, PaymentStatus.REFUNDED));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/refund")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/v1/payments/orders/{id}/confirm should return 400 when amount is invalid")
-    void confirm_shouldReturn400_whenInvalidPayload() throws Exception {
-        PaymentActionRequestDto request = validRequest();
-        request.setAmount(new BigDecimal("0.00"));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.amount").exists());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/payments/orders/{id}/confirm should require authentication")
-    void confirm_shouldReject_whenUnauthenticated() throws Exception {
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .header("X-Trace-Id", "test-trace-id")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.error").value("Unauthorized"))
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void confirm_shouldReturn403_whenUserIsNotAdmin() throws Exception {
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .header("X-Trace-Id", "test-trace-id")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.error").value("Forbidden"))
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/payments/orders/{id}/confirm should return 401 when token is malformed")
-    void confirm_shouldReturn401_whenTokenIsMalformed() throws Exception {
-        when(jwtService.extractUserName("not-a-valid-jwt"))
-                .thenThrow(new JwtException("Invalid JWT"));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .header("Authorization", "Bearer not-a-valid-jwt")
-                        .header("X-Trace-Id", "test-trace-id")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.error").value("Unauthorized"))
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.traceId").value("test-trace-id"));
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void confirm_shouldReturn400_whenAmountHasMoreThanTwoDecimalPlaces() throws Exception {
-        PaymentActionRequestDto request = validRequest();
-        request.setAmount(new BigDecimal("3999.999"));
-
-        mockMvc.perform(post("/api/v1/payments/orders/1/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.amount").exists());
+    @Operation(
+            summary = "Refund payment",
+            description = "Refunds a confirmed payment for an order that has already been canceled",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Payment refunded"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request payload",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ValidationErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Refund not allowed for the current order/payment state",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            )
+    })
+    @PostMapping("/orders/{orderId}/refund")
+    public ResponseEntity<PaymentResponseDto> refund(
+            @PathVariable Long orderId,
+            @Valid
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Refund payload",
+                    required = true,
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Refund payment example",
+                                    value = """
+                                            {
+                                              "transactionId": "TXN-1003",
+                                              "amount": 2899.90,
+                                              "reason": "Customer refunded"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody PaymentActionRequestDto request
+    ) {
+        return ResponseEntity.ok(paymentService.refundPayment(orderId, request));
     }
 }

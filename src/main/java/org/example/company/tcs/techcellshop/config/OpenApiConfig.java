@@ -80,7 +80,7 @@ public class OpenApiConfig {
         body.put("status", 400);
         body.put("error", "Bad Request");
         body.put("code", "INVALID_ARGUMENT");
-        body.put("message", "Payment method is invalid for this order state");
+        body.put("message", "Payment amount does not match the order total");
         body.put("path", "/api/v1/payments/orders/1/confirm");
         body.put("traceId", "89dcdd37-8e85-4f53-8a9b-b10b723d5316");
         body.put("validationErrors", null);
@@ -106,8 +106,8 @@ public class OpenApiConfig {
         body.put("status", 409);
         body.put("error", "Conflict");
         body.put("code", "BUSINESS_CONFLICT");
-        body.put("message", "Coupon has reached maximum usage limit");
-        body.put("path", "/api/v1/orders/1/apply-coupon");
+        body.put("message", "Refund is only allowed for order with confirmed payment");
+        body.put("path", "/api/v1/payments/orders/1/refund");
         body.put("traceId", "9be47dd3-f7a4-4028-b0a5-e6f6e1fc554f");
         body.put("validationErrors", null);
         return new Example().value(body);
