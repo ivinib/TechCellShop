@@ -60,8 +60,10 @@ public class UpdateOrderStatusTest {
     class UpdateStatus {
 
         @Test
-        @DisplayName("should update status when transition is valid")
-        void shouldUpdateStatusWhenTransitionIsValid() {
+        @DisplayName("should update status to PAID when payment is confirmed")
+        void shouldUpdateStatusToPaidWhenPaymentIsConfirmed() {
+            order.setPaymentStatus(PaymentStatus.CONFIRMED);
+
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
             when(orderRepository.save(order)).thenReturn(order);
 
@@ -71,6 +73,16 @@ public class UpdateOrderStatusTest {
 
             verify(orderStatusTransitionValidator).validateTransition(OrderStatus.CREATED, OrderStatus.PAID);
             verify(orderRepository).save(order);
+        }
+
+        @Test
+        @DisplayName("should throw when marking order as paid without confirmed payment")
+        void shouldThrowWhenMarkingOrderAsPaidWithoutConfirmedPayment() {
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> updateOrderStatus.updateStatus(1L, OrderStatus.PAID, null))
+                    .isInstanceOf(InvalidOrderStatusTransitionException.class)
+                    .hasMessage("Order cannot be marked as paid without confirmed payment");
         }
 
         @Test

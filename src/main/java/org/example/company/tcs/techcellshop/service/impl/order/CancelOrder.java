@@ -15,6 +15,7 @@ import static org.example.company.tcs.techcellshop.util.AppConstants.ORDER_NOT_F
 
 @Component
 public class CancelOrder {
+
     private static final Logger log = LoggerFactory.getLogger(CancelOrder.class);
 
     private final OrderRepository orderRepository;
@@ -47,8 +48,15 @@ public class CancelOrder {
                         : reason
         );
 
-        deviceService.releaseStock(order.getDevice().getIdDevice(), order.getQuantityOrder());
+        deviceService.releaseStock(resolveDeviceId(order), order.getQuantityOrder());
         return orderRepository.save(order);
+    }
+
+    private Long resolveDeviceId(Order order) {
+        if (order.getDevice() != null && order.getDevice().getIdDevice() != null) {
+            return order.getDevice().getIdDevice();
+        }
+        return order.getDeviceIdSnapshot();
     }
 
     private Order getOrderOrThrow(Long orderId) {

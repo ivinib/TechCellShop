@@ -21,7 +21,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final DeviceService deviceService;
 
-    public PaymentServiceImpl(OrderRepository orderRepository, DeviceService deviceService){
+    public PaymentServiceImpl(OrderRepository orderRepository, DeviceService deviceService) {
         this.orderRepository = orderRepository;
         this.deviceService = deviceService;
     }
@@ -31,13 +31,19 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponseDto confirmPayment(Long orderId, PaymentActionRequestDto request) {
         Order order = getOrderOrThrow(orderId);
 
-        if (order.getStatus().equals(OrderStatus.CANCELED)){
+        if (order.getStatus().equals(OrderStatus.CANCELED)) {
             throw new IllegalStateException("Cannot confirm payment for a canceled order");
-        } else if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)){
+        }
+
+        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)) {
             throw new IllegalStateException("Cannot confirm payment for an order that is already shipped or delivered");
         }
 
-        if (order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)){
+        if (order.getPaymentStatus().equals(PaymentStatus.REFUNDED)) {
+            throw new IllegalStateException("Cannot confirm payment for a refunded order");
+        }
+
+        if (order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
             return toResponse(order);
         }
 
@@ -45,7 +51,7 @@ public class PaymentServiceImpl implements PaymentService {
                 ? order.getFinalAmount()
                 : order.getTotalPriceOrder();
 
-        if (request.getAmount().compareTo(expectedAmount) != 0){
+        if (request.getAmount().compareTo(expectedAmount) != 0) {
             throw new IllegalArgumentException("Payment amount does not match the order total");
         }
 
@@ -61,21 +67,33 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponseDto failPayment(Long orderId, PaymentActionRequestDto request) {
         Order order = getOrderOrThrow(orderId);
 
-        if (order.getPaymentStatus().equals(PaymentStatus.FAILED)){
+        if (order.getPaymentStatus().equals(PaymentStatus.FAILED)) {
             return toResponse(order);
         }
 
-        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)){
+        if (order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
+            throw new IllegalStateException("Cannot fail payment that is already confirmed");
+        }
+
+        if (order.getPaymentStatus().equals(PaymentStatus.REFUNDED)) {
+            throw new IllegalStateException("Cannot fail payment that is already refunded");
+        }
+
+        if (order.getStatus().equals(OrderStatus.SHIPPED) || order.getStatus().equals(OrderStatus.DELIVERED)) {
             throw new IllegalStateException("Cannot fail payment for an order that is already shipped or delivered");
         }
 
-        if (!order.getStatus().equals(OrderStatus.CANCELED)){
-            deviceService.releaseStock(order.getDevice().getIdDevice(), order.getQuantityOrder());
+        if (!order.getStatus().equals(OrderStatus.CANCELED)) {
+            deviceService.releaseStock(resolveDeviceId(order), order.getQuantityOrder());
         }
 
         order.setPaymentStatus(PaymentStatus.FAILED);
         order.setStatus(OrderStatus.CANCELED);
-        order.setCanceledReason((null == request.getReason() || request.getReason().isBlank() ? "Payment confirmation failed" : request.getReason()));
+        order.setCanceledReason(
+                request.getReason() == null || request.getReason().isBlank()
+                        ? "Payment confirmation failed"
+                        : request.getReason()
+        );
 
         orderRepository.save(order);
         return toResponse(order);
@@ -86,14 +104,16 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponseDto refundPayment(Long orderId, PaymentActionRequestDto request) {
         Order order = getOrderOrThrow(orderId);
 
-        if (order.getPaymentStatus().equals(PaymentStatus.REFUNDED)){
+        if (order.getPaymentStatus().equals(PaymentStatus.REFUNDED)) {
             return toResponse(order);
         }
 
-        if (!order.getStatus().equals(OrderStatus.CANCELED)){
+        if (!order.getStatus().equals(OrderStatus.CANCELED)) {
             throw new IllegalStateException("Cannot refund payment for an order that is not canceled");
-        } else if (!order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)){
-            throw new IllegalArgumentException("Refund is only allowed for order with confirmed payment");
+        }
+
+        if (!order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
+            throw new IllegalStateException("Refund is only allowed for order with confirmed payment");
         }
 
         order.setPaymentStatus(PaymentStatus.REFUNDED);
@@ -105,6 +125,13 @@ public class PaymentServiceImpl implements PaymentService {
     private Order getOrderOrThrow(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+    }
+
+    private Long resolveDeviceId(Order order) {
+        if (order.getDevice() != null && order.getDevice().getIdDevice() != null) {
+            return order.getDevice().getIdDevice();
+        }
+        return order.getDeviceIdSnapshot();
     }
 
     private PaymentResponseDto toResponse(Order order) {

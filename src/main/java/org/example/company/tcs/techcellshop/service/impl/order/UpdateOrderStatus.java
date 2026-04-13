@@ -41,6 +41,13 @@ public class UpdateOrderStatus {
         Order order = getOrderOrThrow(orderId);
         orderStatusTransitionValidator.validateTransition(order.getStatus(), newStatus);
 
+        if (newStatus.equals(OrderStatus.PAID)
+                && !order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
+            throw new InvalidOrderStatusTransitionException(
+                    "Order cannot be marked as paid without confirmed payment"
+            );
+        }
+
         if (newStatus.equals(OrderStatus.SHIPPED)
                 && !order.getPaymentStatus().equals(PaymentStatus.CONFIRMED)) {
             throw new InvalidOrderStatusTransitionException(

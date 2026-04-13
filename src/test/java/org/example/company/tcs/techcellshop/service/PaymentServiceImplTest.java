@@ -163,6 +163,20 @@ class PaymentServiceImplTest {
         }
 
         @Test
+        @DisplayName("should throw when payment is already refunded")
+        void shouldThrowWhenPaymentIsAlreadyRefunded() {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> paymentService.confirmPayment(1L, request))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Cannot confirm payment for a refunded order");
+
+            verify(orderRepository, never()).save(any(Order.class));
+        }
+
+        @Test
         @DisplayName("should throw when payment amount does not match order total")
         void shouldThrowWhenPaymentAmountDoesNotMatchOrderTotal() {
             request.setAmount(money("7000.00"));
@@ -240,6 +254,36 @@ class PaymentServiceImplTest {
 
             assertThat(result.getOrderId()).isEqualTo(1L);
             assertThat(result.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+
+            verify(deviceService, never()).releaseStock(any(), any());
+            verify(orderRepository, never()).save(any(Order.class));
+        }
+
+        @Test
+        @DisplayName("should throw when payment is already confirmed")
+        void shouldThrowWhenPaymentIsAlreadyConfirmed() {
+            order.setPaymentStatus(PaymentStatus.CONFIRMED);
+
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> paymentService.failPayment(1L, request))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Cannot fail payment that is already confirmed");
+
+            verify(deviceService, never()).releaseStock(any(), any());
+            verify(orderRepository, never()).save(any(Order.class));
+        }
+
+        @Test
+        @DisplayName("should throw when payment is already refunded")
+        void shouldThrowWhenPaymentIsAlreadyRefunded() {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> paymentService.failPayment(1L, request))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Cannot fail payment that is already refunded");
 
             verify(deviceService, never()).releaseStock(any(), any());
             verify(orderRepository, never()).save(any(Order.class));
@@ -367,7 +411,7 @@ class PaymentServiceImplTest {
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
             assertThatThrownBy(() -> paymentService.refundPayment(1L, request))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Refund is only allowed for order with confirmed payment");
 
             verify(orderRepository, never()).save(any(Order.class));

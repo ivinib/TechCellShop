@@ -1,6 +1,5 @@
 package org.example.company.tcs.techcellshop.service.order;
 
-
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.exception.InvalidOrderStatusTransitionException;
@@ -49,13 +48,14 @@ class CancelOrderTest {
         order = new Order();
         order.setIdOrder(1L);
         order.setDevice(device);
+        order.setDeviceIdSnapshot(1L);
         order.setQuantityOrder(2);
         order.setStatus(OrderStatus.CREATED);
     }
 
     @Nested
     @DisplayName("cancelOrder")
-    class CancelOrder {
+    class CancelOrderFlow {
 
         @Test
         @DisplayName("should cancel order and release stock")
@@ -69,6 +69,24 @@ class CancelOrderTest {
             assertThat(result.getCanceledReason()).isEqualTo("Customer request");
 
             verify(deviceService).releaseStock(1L, 2);
+            verify(orderRepository).save(order);
+        }
+
+        @Test
+        @DisplayName("should cancel order and release stock using device snapshot when relation is null")
+        void shouldCancelOrderAndReleaseStockUsingDeviceSnapshotWhenRelationIsNull() {
+            order.setDevice(null);
+            order.setDeviceIdSnapshot(99L);
+
+            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.save(order)).thenReturn(order);
+
+            Order result = cancelOrder.cancelOrder(1L, "Customer request");
+
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELED);
+            assertThat(result.getCanceledReason()).isEqualTo("Customer request");
+
+            verify(deviceService).releaseStock(99L, 2);
             verify(orderRepository).save(order);
         }
 
@@ -94,7 +112,10 @@ class CancelOrderTest {
 
             assertThat(result).isSameAs(order);
 
-            verify(deviceService, never()).releaseStock(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
+            verify(deviceService, never()).releaseStock(
+                    org.mockito.ArgumentMatchers.anyLong(),
+                    org.mockito.ArgumentMatchers.anyInt()
+            );
             verify(orderRepository, never()).save(order);
         }
 
