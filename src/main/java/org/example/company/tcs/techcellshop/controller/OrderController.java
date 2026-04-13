@@ -1,14 +1,17 @@
 package org.example.company.tcs.techcellshop.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.example.company.tcs.techcellshop.domain.ErrorResponse;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
@@ -44,16 +47,42 @@ public class OrderController {
 
     @Operation(
             summary = "Place a new order",
-            description = "Creates an order for the authenticated user and triggers the order placement flow",
+            description = "Creates an order for the authenticated user, requires the Idempotency-Key header and triggers the order placement flow",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Order created"),
-            @ApiResponse(responseCode = "400", description = "Validation error"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Validation error or missing Idempotency-Key",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(ref = "#/components/examples/ValidationErrorExample"),
+                                    @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Business conflict such as insufficient stock or reused idempotency key for different payload",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            )
     })
     @PostMapping
     public ResponseEntity<OrderResponse> saveOrder(
+            @Parameter(description = "Unique idempotency key for safe retries", required = true, example = "ORDER-KEY-001")
             @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
             @Valid
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -66,7 +95,7 @@ public class OrderController {
                                             {
                                               "idDevice": 1,
                                               "quantityOrder": 1,
-                                              "paymentMethod": "CREDIT_CARD"
+                                              "paymentMethod": "PIX"
                                             }
                                             """
                             )
@@ -89,6 +118,7 @@ public class OrderController {
 
     @Operation(
             summary = "List all orders",
+            description = "Returns a paginated list of all orders. Restricted to admin users.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @PreAuthorize("hasRole('ADMIN')")
@@ -102,9 +132,21 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "List orders for the authenticated user",
+            summary = "List authenticated user's orders",
+            description = "Returns a paginated list of orders that belong to the authenticated user.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Orders returned"),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            )
+    })
     @GetMapping("/me")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
             Authentication authentication,
@@ -116,9 +158,37 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "Get a specific order using its id",
+            summary = "Get order by id",
+            description = "Returns a specific order by id. Admin can access any order; regular users can only access their own orders.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Order returned"),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
+                    )
+            )
+    })
     @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
@@ -127,7 +197,8 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "Update an order",
+            summary = "Update order",
+            description = "Updates an order using a full payload. Restricted to admin users.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @PreAuthorize("hasRole('ADMIN')")
@@ -138,7 +209,8 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "Partially update an order",
+            summary = "Partially update order",
+            description = "Updates selected order fields. Restricted to admin users.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @PreAuthorize("hasRole('ADMIN')")
@@ -149,7 +221,8 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "Delete an order based on its id",
+            summary = "Delete order",
+            description = "Deletes an order by id. Restricted to admin users.",
             security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
     )
     @PreAuthorize("hasRole('ADMIN')")
@@ -159,16 +232,88 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(
+            summary = "Update order status",
+            description = "Changes the order status according to business transition rules. Restricted to admin users.",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Order status updated"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Validation error",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/ValidationErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Invalid status transition or payment/order state conflict",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            )
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateStatus(
             @PathVariable Long id,
-            @Valid @RequestBody OrderStatusUpdateRequestDto request
+            @Valid
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "New status payload",
+                    required = true,
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Status update example",
+                                    value = """
+                                            {
+                                              "newStatus": "SHIPPED",
+                                              "reason": "Sent to carrier"
+                                            }
+                                            """
+                            )
+                    )
+            )
+            @RequestBody OrderStatusUpdateRequestDto request
     ) {
         Order updated = orderService.updateStatus(id, request.getNewStatus(), request.getReason());
         return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
     }
 
+    @Operation(
+            summary = "Cancel order",
+            description = "Cancels an order when business rules allow it. Admin can cancel any order; regular users can cancel their own orders.",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Order canceled"),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Order cannot be canceled in the current state",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            )
+    })
     @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @PostMapping("/{id}/cancel")
     public ResponseEntity<OrderResponse> cancelOrder(
@@ -179,6 +324,41 @@ public class OrderController {
         return ResponseEntity.ok(responseMapper.toOrderResponse(canceled));
     }
 
+    @Operation(
+            summary = "Apply coupon to order",
+            description = "Applies a coupon to an order when the order state and coupon rules allow it.",
+            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Coupon applied"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid coupon request",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(ref = "#/components/examples/ValidationErrorExample"),
+                                    @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Order not found",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Coupon or order state conflict",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
+                    )
+            )
+    })
     @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
     @PostMapping("/{id}/apply-coupon")
     public ResponseEntity<OrderResponse> applyCoupon(

@@ -1,371 +1,528 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import org.example.company.tcs.techcellshop.domain.ErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.OrderUpdateRequest;
+import org.example.company.tcs.techcellshop.dto.response.DeviceSummaryResponse;
 import org.example.company.tcs.techcellshop.dto.response.OrderResponse;
+import org.example.company.tcs.techcellshop.dto.response.UserSummaryResponse;
+import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
+import org.example.company.tcs.techcellshop.exception.InsufficientStockException;
+import org.example.company.tcs.techcellshop.exception.ResourceNotFoundException;
 import org.example.company.tcs.techcellshop.mapper.ResponseMapper;
+import org.example.company.tcs.techcellshop.security.AccessPolicy;
+import org.example.company.tcs.techcellshop.security.CustomUserDetailsService;
+import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
+import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
+import org.example.company.tcs.techcellshop.security.RestAuthenticationEntryPoint;
+import org.example.company.tcs.techcellshop.service.JwtService;
 import org.example.company.tcs.techcellshop.service.OrderService;
+import org.example.company.tcs.techcellshop.util.OrderStatus;
+import org.example.company.tcs.techcellshop.util.PaymentStatus;
+import org.example.company.tcs.techcellshop.util.TraceIdFilter;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.net.URI;
+import java.math.BigDecimal;
+import java.util.List;
 
-import static org.example.company.tcs.techcellshop.util.AppConstants.SECURITY_SCHEME_NAME;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Tag(name = "Order Management", description = "Order management endpoints")
-@RestController
-@RequestMapping("/api/v1/orders")
-public class OrderController {
+@WebMvcTest(OrderController.class)
+@Import({
+        GlobalExceptionHandler.class,
+        TraceIdFilter.class,
+        SecurityWebMvcTestConfig.class
+})
+class OrderControllerTest {
 
-    private final OrderService orderService;
-    private final ResponseMapper responseMapper;
+    @Autowired
+    private MockMvc mockMvc;
 
-    OrderController(OrderService orderService, ResponseMapper responseMapper) {
-        this.orderService = orderService;
-        this.responseMapper = responseMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockitoBean
+    private OrderService orderService;
+
+    @MockitoBean
+    private ResponseMapper responseMapper;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
+
+    @MockitoBean
+    private JwtService jwtService;
+
+    @MockitoBean
+    private AccessPolicy accessPolicy;
+
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @MockitoBean
+    private RestAccessDeniedHandler restAccessDeniedHandler;
+
+    private OrderEnrollmentRequest validEnrollmentRequest;
+    private OrderUpdateRequest validUpdateRequest;
+    private OrderStatusUpdateRequestDto statusUpdateRequest;
+    private Order mockOrder;
+    private OrderResponse mockOrderResponse;
+
+    @BeforeEach
+    void setUp() {
+        validEnrollmentRequest = new OrderEnrollmentRequest();
+        validEnrollmentRequest.setIdDevice(1L);
+        validEnrollmentRequest.setQuantityOrder(1);
+        validEnrollmentRequest.setPaymentMethod("CREDIT_CARD");
+
+        validUpdateRequest = new OrderUpdateRequest();
+        validUpdateRequest.setQuantityOrder(1);
+        validUpdateRequest.setStatusOrder(OrderStatus.PAID);
+        validUpdateRequest.setDeliveryDate("2026-04-10");
+        validUpdateRequest.setPaymentStatus(PaymentStatus.CONFIRMED);
+
+        statusUpdateRequest = new OrderStatusUpdateRequestDto();
+        statusUpdateRequest.setNewStatus(OrderStatus.SHIPPED);
+        statusUpdateRequest.setReason("Sent to carrier");
+
+        mockOrder = new Order();
+        mockOrder.setIdOrder(1L);
+        mockOrder.setQuantityOrder(1);
+        mockOrder.setTotalPriceOrder(money("3999.90"));
+
+        mockOrderResponse = new OrderResponse(
+                1L,
+                new UserSummaryResponse(1L, "Ana Silva", "a***a@techcellshop.com"),
+                new DeviceSummaryResponse(1L, "Galaxy S24", money("3999.90")),
+                1,
+                money("3999.90"),
+                OrderStatus.CREATED,
+                "2026-04-01",
+                "2026-04-06",
+                "CREDIT_CARD",
+                PaymentStatus.PENDING,
+                "WELCOME10",
+                money("10.00"),
+                money("3989.90"),
+                "User wants to pay with another card"
+        );
     }
 
-    @Operation(
-            summary = "Place a new order",
-            description = "Creates an order for the authenticated user, requires the Idempotency-Key header and triggers the order placement flow",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Order created"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Validation error or missing Idempotency-Key",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = {
-                                    @ExampleObject(ref = "#/components/examples/ValidationErrorExample"),
-                                    @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
-                            }
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Business conflict such as insufficient stock or reused idempotency key for different payload",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
-                    )
-            )
-    })
-    @PostMapping
-    public ResponseEntity<OrderResponse> saveOrder(
-            @Parameter(description = "Unique idempotency key for safe retries", required = true, example = "ORDER-KEY-001")
-            @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
-            @Valid
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Order enrollment payload",
-                    required = true,
-                    content = @Content(
-                            examples = @ExampleObject(
-                                    name = "Order payload example",
-                                    value = """
-                                            {
-                                              "idDevice": 1,
-                                              "quantityOrder": 1,
-                                              "paymentMethod": "PIX"
-                                            }
-                                            """
-                            )
-                    )
-            )
-            @RequestBody OrderEnrollmentRequest request,
-            Authentication authentication,
-            UriComponentsBuilder uriBuilder
-    ) {
-        Order savedOrder = orderService.placeOrder(request, authentication.getName(), idempotencyKey);
-        OrderResponse response = responseMapper.toOrderResponse(savedOrder);
+    @Nested
+    @DisplayName("POST /api/v1/orders")
+    class SaveOrder {
 
-        URI location = uriBuilder
-                .path("/api/v1/orders/{id}")
-                .buildAndExpand(savedOrder.getIdOrder())
-                .toUri();
+        @Test
+        @WithMockUser(username = "customer@test.com", roles = "USER")
+        @DisplayName("Should return 201 when request is valid")
+        void shouldReturn201_whenRequestIsValid() throws Exception {
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("customer@test.com"), eq("KEY-001")))
+                    .thenReturn(mockOrder);
+            when(responseMapper.toOrderResponse(mockOrder)).thenReturn(mockOrderResponse);
 
-        return ResponseEntity.created(location).body(response);
+            mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string("Location", containsString("/api/v1/orders/1")))
+                    .andExpect(jsonPath("$.idOrder").value(1L))
+                    .andExpect(jsonPath("$.statusOrder").value("CREATED"));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when unauthenticated")
+        void shouldReturn401_whenUnauthenticated() throws Exception {
+            mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @WithMockUser(username = "customer@test.com", roles = "USER")
+        @DisplayName("Should return 400 when Idempotency-Key is missing")
+        void shouldReturn400_whenIdempotencyKeyIsMissing() throws Exception {
+            mockMvc.perform(post("/api/v1/orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders"));
+        }
+
+        @Test
+        @WithMockUser(username = "customer@test.com", roles = "USER")
+        @DisplayName("Should return 409 when stock is insufficient")
+        void shouldReturn409_whenStockIsInsufficient() throws Exception {
+            when(orderService.placeOrder(any(OrderEnrollmentRequest.class), eq("customer@test.com"), eq("KEY-001")))
+                    .thenThrow(new InsufficientStockException("Insufficient stock for device id 1"));
+
+            mockMvc.perform(post("/api/v1/orders")
+                            .header("Idempotency-Key", "KEY-001")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validEnrollmentRequest)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.status").value(409))
+                    .andExpect(jsonPath("$.error").value("Conflict"))
+                    .andExpect(jsonPath("$.code").value("BUSINESS_CONFLICT"))
+                    .andExpect(jsonPath("$.message").value("Insufficient stock for device id 1"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders"));
+        }
     }
 
-    @Operation(
-            summary = "List all orders",
-            description = "Returns a paginated list of all orders. Restricted to admin users.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping
-    public ResponseEntity<Page<OrderResponse>> getAllOrders(
-            @PageableDefault(size = 20, sort = "idOrder") Pageable pageable
-    ) {
-        Page<Order> orders = orderService.getAllOrders(pageable);
-        Page<OrderResponse> response = orders.map(responseMapper::toOrderResponse);
-        return ResponseEntity.ok(response);
+    @Nested
+    @DisplayName("GET /api/v1/orders")
+    class GetAllOrders {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 with order list")
+        void shouldReturn200_withOrderList() throws Exception {
+            Page<Order> ordersPage = new PageImpl<>(List.of(mockOrder), PageRequest.of(0, 20), 1);
+
+            when(orderService.getAllOrders(any(Pageable.class))).thenReturn(ordersPage);
+            when(responseMapper.toOrderResponse(mockOrder)).thenReturn(mockOrderResponse);
+
+            mockMvc.perform(get("/api/v1/orders")
+                            .param("page", "0")
+                            .param("size", "20"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].idOrder").value(1L))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.number").value(0))
+                    .andExpect(jsonPath("$.size").value(20));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when unauthenticated")
+        void shouldReturn401_whenUnauthenticated() throws Exception {
+            mockMvc.perform(get("/api/v1/orders"))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
-    @Operation(
-            summary = "List authenticated user's orders",
-            description = "Returns a paginated list of orders that belong to the authenticated user.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Orders returned"),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
-                    )
-            )
-    })
-    @GetMapping("/me")
-    public ResponseEntity<Page<OrderResponse>> getMyOrders(
-            Authentication authentication,
-            @PageableDefault(size = 20, sort = "idOrder") Pageable pageable
-    ) {
-        Page<Order> orders = orderService.getOrdersForUser(authentication.getName(), pageable);
-        Page<OrderResponse> response = orders.map(responseMapper::toOrderResponse);
-        return ResponseEntity.ok(response);
+    @Nested
+    @DisplayName("GET /api/v1/orders/{id}")
+    class GetOrderById {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when order is found")
+        void shouldReturn200_whenOrderIsFound() throws Exception {
+            when(orderService.getOrderById(1L)).thenReturn(mockOrder);
+            when(responseMapper.toOrderResponse(any(Order.class))).thenReturn(mockOrderResponse);
+
+            mockMvc.perform(get("/api/v1/orders/1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.idOrder").value(1L));
+        }
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 404 when order is not found")
+        void shouldReturn404_whenOrderIsNotFound() throws Exception {
+            when(orderService.getOrderById(99L))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
+
+            mockMvc.perform(get("/api/v1/orders/99"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
+        }
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should include traceId in error response")
+        void shouldIncludeTraceIdInErrorResponse() throws Exception {
+            when(orderService.getOrderById(99L))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
+
+            mockMvc.perform(get("/api/v1/orders/99")
+                            .header("X-Trace-Id", "trace-test-123"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.traceId").value("trace-test-123"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
+        }
     }
 
-    @Operation(
-            summary = "Get order by id",
-            description = "Returns a specific order by id. Admin can access any order; regular users can only access their own orders.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Order returned"),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Order not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/UnauthorizedErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Forbidden",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/ForbiddenErrorExample")
-                    )
-            )
-    })
-    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
-    @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
-        Order order = orderService.getOrderById(id);
-        return ResponseEntity.ok(responseMapper.toOrderResponse(order));
+    @Nested
+    @DisplayName("PUT /api/v1/orders/{id}")
+    class UpdateOrder {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when order is updated")
+        void shouldReturn200_whenOrderIsUpdated() throws Exception {
+            OrderResponse updatedResponse = new OrderResponse(
+                    1L,
+                    mockOrderResponse.user(),
+                    mockOrderResponse.device(),
+                    1,
+                    money("3999.90"),
+                    OrderStatus.PAID,
+                    "2026-04-01",
+                    "2026-04-10",
+                    "CREDIT_CARD",
+                    PaymentStatus.CONFIRMED,
+                    "WELCOME10",
+                    money("10.00"),
+                    money("3989.90"),
+                    "User wants to pay with another card"
+            );
+
+            when(orderService.updateOrder(eq(1L), any(OrderUpdateRequest.class))).thenReturn(mockOrder);
+            when(responseMapper.toOrderResponse(any(Order.class))).thenReturn(updatedResponse);
+
+            mockMvc.perform(put("/api/v1/orders/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.statusOrder").value("PAID"))
+                    .andExpect(jsonPath("$.paymentStatus").value("CONFIRMED"));
+        }
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 404 when order is not found")
+        void shouldReturn404_whenOrderIsNotFound() throws Exception {
+            when(orderService.updateOrder(eq(99L), any(OrderUpdateRequest.class)))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
+
+            mockMvc.perform(put("/api/v1/orders/99")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
+        }
     }
 
-    @Operation(
-            summary = "Update order",
-            description = "Updates an order using a full payload. Restricted to admin users.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}")
-    public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
-        Order updatedOrder = orderService.updateOrder(id, request);
-        return ResponseEntity.ok(responseMapper.toOrderResponse(updatedOrder));
+    @Nested
+    @DisplayName("PATCH /api/v1/orders/{id}")
+    class PartialUpdateOrder {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when partially updated")
+        void shouldReturn200_whenPartiallyUpdated() throws Exception {
+            when(orderService.updateOrder(eq(1L), any(OrderUpdateRequest.class))).thenReturn(mockOrder);
+            when(responseMapper.toOrderResponse(any(Order.class))).thenReturn(mockOrderResponse);
+
+            mockMvc.perform(patch("/api/v1/orders/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validUpdateRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.idOrder").value(1L));
+        }
     }
 
-    @Operation(
-            summary = "Partially update order",
-            description = "Updates selected order fields. Restricted to admin users.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @PreAuthorize("hasRole('ADMIN')")
-    @PatchMapping("/{id}")
-    public ResponseEntity<OrderResponse> partiallyUpdateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
-        Order updatedOrder = orderService.updateOrder(id, request);
-        return ResponseEntity.ok(responseMapper.toOrderResponse(updatedOrder));
+    @Nested
+    @DisplayName("DELETE /api/v1/orders/{id}")
+    class DeleteOrder {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 204 when order is deleted")
+        void shouldReturn204_whenOrderIsDeleted() throws Exception {
+            doNothing().when(orderService).deleteOrder(1L);
+
+            mockMvc.perform(delete("/api/v1/orders/1"))
+                    .andExpect(status().isNoContent());
+        }
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 404 when order is not found")
+        void shouldReturn404_whenOrderIsNotFound() throws Exception {
+            doThrow(new ResourceNotFoundException("Order not found with id: 99"))
+                    .when(orderService).deleteOrder(99L);
+
+            mockMvc.perform(delete("/api/v1/orders/99"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.status").value(404))
+                    .andExpect(jsonPath("$.error").value("Not Found"))
+                    .andExpect(jsonPath("$.message").value("Order not found with id: 99"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/99"));
+        }
     }
 
-    @Operation(
-            summary = "Delete order",
-            description = "Deletes an order by id. Restricted to admin users.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
-        orderService.deleteOrder(id);
-        return ResponseEntity.noContent().build();
+    @Nested
+    @DisplayName("PATCH /api/v1/orders/{id}/status")
+    class UpdateStatus {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when status is updated")
+        void shouldReturn200_whenStatusIsUpdated() throws Exception {
+            OrderResponse shippedResponse = new OrderResponse(
+                    1L,
+                    mockOrderResponse.user(),
+                    mockOrderResponse.device(),
+                    1,
+                    money("3999.90"),
+                    OrderStatus.SHIPPED,
+                    "2026-04-01",
+                    "2026-04-06",
+                    "CREDIT_CARD",
+                    PaymentStatus.CONFIRMED,
+                    "WELCOME10",
+                    money("10.00"),
+                    money("3989.90"),
+                    "User wants to pay with another card"
+            );
+
+            Order shippedOrder = new Order();
+            shippedOrder.setIdOrder(1L);
+
+            when(orderService.updateStatus(eq(1L), eq(OrderStatus.SHIPPED), eq("Sent to carrier")))
+                    .thenReturn(shippedOrder);
+            when(responseMapper.toOrderResponse(shippedOrder)).thenReturn(shippedResponse);
+
+            mockMvc.perform(patch("/api/v1/orders/1/status")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(statusUpdateRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.statusOrder").value("SHIPPED"));
+        }
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 400 when newStatus is missing")
+        void shouldReturn400_whenNewStatusIsMissing() throws Exception {
+            OrderStatusUpdateRequestDto invalid = new OrderStatusUpdateRequestDto();
+            invalid.setReason("missing status");
+
+            mockMvc.perform(patch("/api/v1/orders/1/status")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalid)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.message").value("Validation failed"))
+                    .andExpect(jsonPath("$.path").value("/api/v1/orders/1/status"))
+                    .andExpect(jsonPath("$.validationErrors.newStatus").exists());
+        }
     }
 
-    @Operation(
-            summary = "Update order status",
-            description = "Changes the order status according to business transition rules. Restricted to admin users.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Order status updated"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Validation error",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/ValidationErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Order not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Invalid status transition or payment/order state conflict",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
-                    )
-            )
-    })
-    @PreAuthorize("hasRole('ADMIN')")
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<OrderResponse> updateStatus(
-            @PathVariable Long id,
-            @Valid
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "New status payload",
-                    required = true,
-                    content = @Content(
-                            examples = @ExampleObject(
-                                    name = "Status update example",
-                                    value = """
-                                            {
-                                              "newStatus": "SHIPPED",
-                                              "reason": "Sent to carrier"
-                                            }
-                                            """
-                            )
-                    )
-            )
-            @RequestBody OrderStatusUpdateRequestDto request
-    ) {
-        Order updated = orderService.updateStatus(id, request.getNewStatus(), request.getReason());
-        return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
+    @Nested
+    @DisplayName("POST /api/v1/orders/{id}/cancel")
+    class CancelOrder {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when order is canceled")
+        void shouldReturn200_whenOrderIsCanceled() throws Exception {
+            OrderResponse canceledResponse = new OrderResponse(
+                    1L,
+                    mockOrderResponse.user(),
+                    mockOrderResponse.device(),
+                    1,
+                    money("3999.90"),
+                    OrderStatus.CANCELED,
+                    "2026-04-01",
+                    "2026-04-06",
+                    "CREDIT_CARD",
+                    PaymentStatus.FAILED,
+                    "WELCOME10",
+                    money("10.00"),
+                    money("3989.90"),
+                    "User wants to pay with another card"
+            );
+
+            Order canceledOrder = new Order();
+            canceledOrder.setIdOrder(1L);
+
+            when(orderService.cancelOrder(1L, "Customer request")).thenReturn(canceledOrder);
+            when(responseMapper.toOrderResponse(canceledOrder)).thenReturn(canceledResponse);
+
+            mockMvc.perform(post("/api/v1/orders/1/cancel")
+                            .param("reason", "Customer request"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.statusOrder").value("CANCELED"));
+        }
     }
 
-    @Operation(
-            summary = "Cancel order",
-            description = "Cancels an order when business rules allow it. Admin can cancel any order; regular users can cancel their own orders.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Order canceled"),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Order not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Order cannot be canceled in the current state",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
-                    )
-            )
-    })
-    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
-    @PostMapping("/{id}/cancel")
-    public ResponseEntity<OrderResponse> cancelOrder(
-            @PathVariable Long id,
-            @RequestParam(required = false) String reason
-    ) {
-        Order canceled = orderService.cancelOrder(id, reason);
-        return ResponseEntity.ok(responseMapper.toOrderResponse(canceled));
+    @Nested
+    @DisplayName("POST /api/v1/orders/{id}/apply-coupon")
+    class ApplyCoupon {
+
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("Should return 200 when coupon is applied")
+        void shouldReturn200_whenCouponIsApplied() throws Exception {
+            OrderResponse discounted = new OrderResponse(
+                    1L,
+                    mockOrderResponse.user(),
+                    mockOrderResponse.device(),
+                    1,
+                    money("3999.90"),
+                    OrderStatus.CREATED,
+                    "2026-04-01",
+                    "2026-04-06",
+                    "CREDIT_CARD",
+                    PaymentStatus.PENDING,
+                    "WELCOME10",
+                    money("10.00"),
+                    money("3989.90"),
+                    "User wants to pay with another card"
+            );
+
+            Order discountedOrder = new Order();
+            discountedOrder.setIdOrder(1L);
+
+            when(orderService.applyCoupon(1L, "WELCOME10")).thenReturn(discountedOrder);
+            when(responseMapper.toOrderResponse(discountedOrder)).thenReturn(discounted);
+
+            mockMvc.perform(post("/api/v1/orders/1/apply-coupon")
+                            .param("code", "WELCOME10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.idOrder").value(1L));
+        }
     }
 
-    @Operation(
-            summary = "Apply coupon to order",
-            description = "Applies a coupon to an order when the order state and coupon rules allow it.",
-            security = @SecurityRequirement(name = SECURITY_SCHEME_NAME)
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Coupon applied"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid coupon request",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = {
-                                    @ExampleObject(ref = "#/components/examples/ValidationErrorExample"),
-                                    @ExampleObject(ref = "#/components/examples/InvalidArgumentExample")
-                            }
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Order not found",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/NotFoundErrorExample")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Coupon or order state conflict",
-                    content = @Content(
-                            schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(ref = "#/components/examples/BusinessConflictExample")
-                    )
-            )
-    })
-    @PreAuthorize("hasRole('ADMIN') or @accessPolicy.canAccessOrder(#id, authentication)")
-    @PostMapping("/{id}/apply-coupon")
-    public ResponseEntity<OrderResponse> applyCoupon(
-            @PathVariable Long id,
-            @RequestParam @NotBlank String code
-    ) {
-        Order updated = orderService.applyCoupon(id, code);
-        return ResponseEntity.ok(responseMapper.toOrderResponse(updated));
+    private BigDecimal money(String value) {
+        return new BigDecimal(value);
     }
 }

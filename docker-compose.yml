@@ -65,12 +65,13 @@ services:
 
       # JPA
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
 
-      # SQL init
-      SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "true"
-      SPRING_SQL_INIT_MODE: always
-      SPRING_SQL_INIT_DATA_LOCATIONS: classpath:sql/data-postgres.sql
+      # Flyway
+      SPRING_FLYWAY_ENABLED: "true"
+
+      # SQL init handled by Flyway
+      SPRING_SQL_INIT_MODE: never
 
       # RabbitMQ
       SPRING_RABBITMQ_HOST: rabbitmq
