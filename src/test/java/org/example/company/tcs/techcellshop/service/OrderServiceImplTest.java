@@ -19,6 +19,10 @@ import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.OutboxEventRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.impl.OrderServiceImpl;
+import org.example.company.tcs.techcellshop.service.impl.order.ApplyCouponToOrder;
+import org.example.company.tcs.techcellshop.service.impl.order.CancelOrder;
+import org.example.company.tcs.techcellshop.service.impl.order.PlaceOrder;
+import org.example.company.tcs.techcellshop.service.impl.order.UpdateOrderStatus;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +45,8 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
@@ -59,37 +63,16 @@ class OrderServiceImplTest {
     private RequestMapper requestMapper;
 
     @Mock
-    private UserRepository userRepository;
+    private PlaceOrder placeOrder;
 
     @Mock
-    private DeviceRepository deviceRepository;
+    private UpdateOrderStatus updateOrderStatus;
 
     @Mock
-    private DeviceService deviceService;
+    private CancelOrder cancelOrder;
 
     @Mock
-    private OrderStatusTransitionValidator orderStatusTransitionValidator;
-
-    @Mock
-    private CouponService couponService;
-
-    @Mock
-    private OrderIdempondencyRepository orderIdempondencyRepository;
-
-    @Mock
-    private OutboxEventRepository outboxEventRepository;
-
-    @Mock
-    private ObjectMapper objectMapper;
-
-    @Mock
-    private MeterRegistry meterRegistry;
-
-    @Mock
-    private Counter counter;
-
-    @Mock
-    private Timer timer;
+    private ApplyCouponToOrder applyCouponToOrder;
 
     private OrderServiceImpl orderService;
 
@@ -99,13 +82,6 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        when(meterRegistry.counter(anyString())).thenReturn(counter);
-        when(meterRegistry.timer(anyString())).thenReturn(timer);
-        doAnswer(invocation -> {
-            Supplier<?> supplier = invocation.getArgument(0);
-            return supplier.get();
-        }).when(timer).record(org.mockito.ArgumentMatchers.<Supplier<?>>any());
-
         orderService = newOrderService();
 
         user = new User();
@@ -125,6 +101,8 @@ class OrderServiceImplTest {
         order.setDevice(device);
         order.setQuantityOrder(2);
         order.setTotalPriceOrder(money("7999.80"));
+        order.setDiscountAmount(money("0.00"));
+        order.setFinalAmount(money("7999.80"));
         order.setStatus(OrderStatus.CREATED);
         order.setOrderDate("2026-03-24");
         order.setDeliveryDate("2026-03-31");
@@ -146,6 +124,7 @@ class OrderServiceImplTest {
             assertThat(result.getIdOrder()).isEqualTo(1L);
             assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.getPaymentMethod()).isEqualTo("CREDIT_CARD");
+
             verify(orderRepository).save(order);
         }
     }
@@ -193,12 +172,42 @@ class OrderServiceImplTest {
         }
 
         @Test
-        @DisplayName("should return empty list when no orders exist")
-        void shouldReturnEmptyList() {
+        @DisplayName("should return empty page when no orders exist")
+        void shouldReturnEmptyPageWhenNoOrdersExist() {
             when(orderRepository.findAll(any(Pageable.class)))
                     .thenReturn(Page.empty(PageRequest.of(0, 20)));
 
             Page<Order> result = orderService.getAllOrders(PageRequest.of(0, 20));
+
+            assertThat(result.getContent()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("getOrdersForUser")
+    class GetOrdersForUser {
+
+        @Test
+        @DisplayName("should return orders for the given user email")
+        void shouldReturnOrdersForUser() {
+            Page<Order> page = new PageImpl<>(List.of(order), PageRequest.of(0, 20), 1);
+            when(orderRepository.findByUser_EmailUserIgnoreCase(eq("ana@techcellshop.com"), any(Pageable.class)))
+                    .thenReturn(page);
+
+            Page<Order> result = orderService.getOrdersForUser("ana@techcellshop.com", PageRequest.of(0, 20));
+
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().getFirst().getUser().getEmailUser())
+                    .isEqualTo("ana@techcellshop.com");
+        }
+
+        @Test
+        @DisplayName("should return empty page when user has no orders")
+        void shouldReturnEmptyPageWhenUserHasNoOrders() {
+            when(orderRepository.findByUser_EmailUserIgnoreCase(eq("ana@techcellshop.com"), any(Pageable.class)))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
+
+            Page<Order> result = orderService.getOrdersForUser("ana@techcellshop.com", PageRequest.of(0, 20));
 
             assertThat(result.getContent()).isEmpty();
         }
@@ -291,107 +300,114 @@ class OrderServiceImplTest {
     }
 
     @Nested
-    @DisplayName("placeOrder (with Idempotency-Key)")
-    class PlaceOrderIdempotency {
+    @DisplayName("placeOrder")
+    class PlaceOrderDelegation {
 
-        private static final String AUTHENTICATED_EMAIL = "ana@techcellshop.com";
-        private OrderEnrollmentRequest request;
-
-        @BeforeEach
-        void setUpRequest() {
-            request = new OrderEnrollmentRequest();
+        @Test
+        @DisplayName("should delegate non-idempotent placeOrder to PlaceOrder")
+        void shouldDelegateNonIdempotentPlaceOrder() {
+            OrderEnrollmentRequest request = new OrderEnrollmentRequest();
             request.setIdDevice(1L);
             request.setQuantityOrder(1);
             request.setPaymentMethod("PIX");
+
+            when(placeOrder.placeOrder(request, "ana@techcellshop.com")).thenReturn(order);
+
+            Order result = orderService.placeOrder(request, "ana@techcellshop.com");
+
+            assertThat(result).isSameAs(order);
+
+            verify(placeOrder).placeOrder(request, "ana@techcellshop.com");
         }
 
         @Test
-        @DisplayName("new key: should create order and store idempotency record")
-        void shouldCreateOrderAndStoreRecord_whenKeyIsNew() throws Exception {
-            when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
-                    .thenReturn(Optional.empty());
-            when(userRepository.findByEmailUserIgnoreCase(AUTHENTICATED_EMAIL))
-                    .thenReturn(Optional.of(user));
-            when(deviceRepository.findById(1L)).thenReturn(Optional.of(device));
-            doNothing().when(deviceService).reserveStock(1L, 1);
+        @DisplayName("should delegate idempotent placeOrder to PlaceOrder")
+        void shouldDelegateIdempotentPlaceOrder() {
+            OrderEnrollmentRequest request = new OrderEnrollmentRequest();
+            request.setIdDevice(1L);
+            request.setQuantityOrder(1);
+            request.setPaymentMethod("PIX");
 
-            when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-                Order saved = invocation.getArgument(0);
-                if (saved.getIdOrder() == null) {
-                    saved.setIdOrder(1L);
-                }
-                return saved;
-            });
+            when(placeOrder.placeOrder(request, "ana@techcellshop.com", "KEY-001")).thenReturn(order);
 
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"eventId\":\"test\"}");
-            when(outboxEventRepository.save(any(OutboxEvent.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-            when(orderIdempondencyRepository.save(any(OrderIdempondency.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
+            Order result = orderService.placeOrder(request, "ana@techcellshop.com", "KEY-001");
 
-            Order result = orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001");
+            assertThat(result).isSameAs(order);
 
-            assertThat(result.getIdOrder()).isEqualTo(1L);
-            assertThat(result.getTotalPriceOrder()).isEqualByComparingTo("3999.90");
-            assertThat(result.getDiscountAmount()).isEqualByComparingTo("0");
-            assertThat(result.getFinalAmount()).isEqualByComparingTo("3999.90");
-
-            verify(userRepository).findByEmailUserIgnoreCase(AUTHENTICATED_EMAIL);
-            verify(deviceService).reserveStock(1L, 1);
-            verify(outboxEventRepository).save(any(OutboxEvent.class));
-            verify(orderIdempondencyRepository).save(any(OrderIdempondency.class));
+            verify(placeOrder).placeOrder(request, "ana@techcellshop.com", "KEY-001");
         }
+    }
+
+    @Nested
+    @DisplayName("updateStatus")
+    class UpdateStatusDelegation {
 
         @Test
-        @DisplayName("existing key + same payload: should return existing order without creating a new one")
-        void shouldReturnExistingOrder_whenKeyAlreadyExists() {
-            String rawHash = AUTHENTICATED_EMAIL + "|1|1|PIX";
-            String expectedHash = sha256(rawHash);
+        @DisplayName("should delegate updateStatus to UpdateOrderStatus")
+        void shouldDelegateUpdateStatus() {
+            Order paidOrder = new Order();
+            paidOrder.setIdOrder(1L);
+            paidOrder.setStatus(OrderStatus.PAID);
 
-            OrderIdempondency existingRecord = new OrderIdempondency();
-            existingRecord.setIdempotencyKey("KEY-001");
-            existingRecord.setRequestHash(expectedHash);
-            existingRecord.setOrder(order);
+            when(updateOrderStatus.updateStatus(1L, OrderStatus.PAID, "payment confirmed"))
+                    .thenReturn(paidOrder);
 
-            when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
-                    .thenReturn(Optional.of(existingRecord));
+            Order result = orderService.updateStatus(1L, OrderStatus.PAID, "payment confirmed");
 
-            Order result = orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001");
+            assertThat(result).isSameAs(paidOrder);
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
 
-            assertThat(result.getIdOrder()).isEqualTo(1L);
-
-            verify(userRepository, never()).findByEmailUserIgnoreCase(anyString());
-            verify(orderRepository, never()).save(any());
-            verify(orderIdempondencyRepository, never()).save(any());
+            verify(updateOrderStatus).updateStatus(1L, OrderStatus.PAID, "payment confirmed");
         }
+    }
+
+    @Nested
+    @DisplayName("cancelOrder")
+    class CancelOrderDelegation {
 
         @Test
-        @DisplayName("existing key + different payload: should throw IllegalStateException")
-        void shouldThrow_whenKeyExistsWithDifferentPayload() {
-            OrderIdempondency existingRecord = new OrderIdempondency();
-            existingRecord.setIdempotencyKey("KEY-001");
-            existingRecord.setRequestHash("completely-different-hash-0000");
-            existingRecord.setOrder(order);
+        @DisplayName("should delegate cancelOrder to CancelOrder")
+        void shouldDelegateCancelOrder() {
+            Order canceledOrder = new Order();
+            canceledOrder.setIdOrder(1L);
+            canceledOrder.setStatus(OrderStatus.CANCELED);
+            canceledOrder.setCanceledReason("Customer request");
 
-            when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
-                    .thenReturn(Optional.of(existingRecord));
+            when(cancelOrder.cancelOrder(1L, "Customer request")).thenReturn(canceledOrder);
 
-            assertThatThrownBy(() -> orderService.placeOrder(request, AUTHENTICATED_EMAIL, "KEY-001"))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("Idempotency key already used for a different request");
+            Order result = orderService.cancelOrder(1L, "Customer request");
 
-            verify(userRepository, never()).findByEmailUserIgnoreCase(anyString());
-            verify(orderRepository, never()).save(any());
+            assertThat(result).isSameAs(canceledOrder);
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELED);
+            assertThat(result.getCanceledReason()).isEqualTo("Customer request");
+
+            verify(cancelOrder).cancelOrder(1L, "Customer request");
         }
+    }
 
-        private String sha256(String input) {
-            try {
-                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-                byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                return java.util.HexFormat.of().formatHex(hash);
-            } catch (java.security.NoSuchAlgorithmException e) {
-                throw new IllegalStateException("SHA-256 not available", e);
-            }
+    @Nested
+    @DisplayName("applyCoupon")
+    class ApplyCouponDelegation {
+
+        @Test
+        @DisplayName("should delegate applyCoupon to ApplyCouponToOrder")
+        void shouldDelegateApplyCoupon() {
+            Order discountedOrder = new Order();
+            discountedOrder.setIdOrder(1L);
+            discountedOrder.setCouponCode("WELCOME10");
+            discountedOrder.setDiscountAmount(money("10.00"));
+            discountedOrder.setFinalAmount(money("7989.80"));
+
+            when(applyCouponToOrder.applyCoupon(1L, "WELCOME10")).thenReturn(discountedOrder);
+
+            Order result = orderService.applyCoupon(1L, "WELCOME10");
+
+            assertThat(result).isSameAs(discountedOrder);
+            assertThat(result.getCouponCode()).isEqualTo("WELCOME10");
+            assertThat(result.getDiscountAmount()).isEqualByComparingTo("10.00");
+            assertThat(result.getFinalAmount()).isEqualByComparingTo("7989.80");
+
+            verify(applyCouponToOrder).applyCoupon(1L, "WELCOME10");
         }
     }
 
@@ -400,29 +416,19 @@ class OrderServiceImplTest {
             Constructor<OrderServiceImpl> constructor = OrderServiceImpl.class.getDeclaredConstructor(
                     OrderRepository.class,
                     RequestMapper.class,
-                    UserRepository.class,
-                    DeviceRepository.class,
-                    DeviceService.class,
-                    OrderStatusTransitionValidator.class,
-                    CouponService.class,
-                    OrderIdempondencyRepository.class,
-                    ObjectMapper.class,
-                    OutboxEventRepository.class,
-                    MeterRegistry.class
+                    PlaceOrder.class,
+                    UpdateOrderStatus.class,
+                    CancelOrder.class,
+                    ApplyCouponToOrder.class
             );
             constructor.setAccessible(true);
             return constructor.newInstance(
                     orderRepository,
                     requestMapper,
-                    userRepository,
-                    deviceRepository,
-                    deviceService,
-                    orderStatusTransitionValidator,
-                    couponService,
-                    orderIdempondencyRepository,
-                    objectMapper,
-                    outboxEventRepository,
-                    meterRegistry
+                    placeOrder,
+                    updateOrderStatus,
+                    cancelOrder,
+                    applyCouponToOrder
             );
         } catch (ReflectiveOperationException ex) {
             throw new RuntimeException(ex);

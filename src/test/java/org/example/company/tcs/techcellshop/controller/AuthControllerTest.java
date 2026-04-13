@@ -1,6 +1,5 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import org.example.company.tcs.techcellshop.config.SecurityConfig;
 import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.request.AuthRequest;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
@@ -22,7 +21,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
