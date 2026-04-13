@@ -15,11 +15,13 @@ import org.example.company.tcs.techcellshop.repository.OrderRepository;
 import org.example.company.tcs.techcellshop.repository.UserRepository;
 import org.example.company.tcs.techcellshop.service.DeviceService;
 import org.example.company.tcs.techcellshop.service.impl.order.OrderOutboxWriter;
+import org.example.company.tcs.techcellshop.service.impl.order.PlaceOrder;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
@@ -38,6 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class PlaceOrderTest {
+
     @Mock
     private OrderRepository orderRepository;
 
@@ -65,7 +68,7 @@ public class PlaceOrderTest {
     @Mock
     private Timer timer;
 
-    private PlaceOrderTest placeOrder;
+    private PlaceOrder placeOrder;
 
     private User user;
     private Device device;
@@ -112,7 +115,7 @@ public class PlaceOrderTest {
     @DisplayName("placeOrder without idempotency")
     class PlaceOrderWithoutIdempotency {
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("should create order successfully")
         void shouldCreateOrderSuccessfully() {
             when(userRepository.findByEmailUserIgnoreCase("ana@techcellshop.com"))
@@ -131,6 +134,15 @@ public class PlaceOrderTest {
             assertThat(result.getIdOrder()).isEqualTo(1L);
             assertThat(result.getUser()).isEqualTo(user);
             assertThat(result.getDevice()).isEqualTo(device);
+
+            assertThat(result.getUserIdSnapshot()).isEqualTo(1L);
+            assertThat(result.getUserNameSnapshot()).isEqualTo("Ana Silva");
+            assertThat(result.getUserEmailSnapshot()).isEqualTo("ana@techcellshop.com");
+
+            assertThat(result.getDeviceIdSnapshot()).isEqualTo(1L);
+            assertThat(result.getDeviceNameSnapshot()).isEqualTo("Galaxy S24");
+            assertThat(result.getUnitPriceSnapshot()).isEqualByComparingTo("3999.90");
+
             assertThat(result.getStatus()).isEqualTo(OrderStatus.CREATED);
             assertThat(result.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
             assertThat(result.getTotalPriceOrder()).isEqualByComparingTo("3999.90");
@@ -142,7 +154,7 @@ public class PlaceOrderTest {
             verify(counter).increment();
         }
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("should throw when authenticated email is blank")
         void shouldThrowWhenAuthenticatedEmailIsBlank() {
             assertThatThrownBy(() -> placeOrder.placeOrder(request, " "))
@@ -150,7 +162,7 @@ public class PlaceOrderTest {
                     .hasMessage("Authenticated user email is required");
         }
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("should throw when user is not found")
         void shouldThrowWhenUserIsNotFound() {
             when(userRepository.findByEmailUserIgnoreCase("ana@techcellshop.com"))
@@ -161,7 +173,7 @@ public class PlaceOrderTest {
                     .hasMessage("User not found for authenticated principal: ana@techcellshop.com");
         }
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("should throw when device is not found")
         void shouldThrowWhenDeviceIsNotFound() {
             when(userRepository.findByEmailUserIgnoreCase("ana@techcellshop.com"))
@@ -170,7 +182,7 @@ public class PlaceOrderTest {
 
             assertThatThrownBy(() -> placeOrder.placeOrder(request, "ana@techcellshop.com"))
                     .isInstanceOf(ResourceNotFoundException.class)
-                    .hasMessage("Device not found with id: 1");
+                    .hasMessage("No device found with id: 1");
         }
     }
 
@@ -178,7 +190,7 @@ public class PlaceOrderTest {
     @DisplayName("placeOrder with idempotency")
     class PlaceOrderWithIdempotency {
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("new key should create order and store idempotency record")
         void shouldCreateOrderAndStoreRecordWhenKeyIsNew() {
             when(orderIdempondencyRepository.findByIdempotencyKey("KEY-001"))
@@ -200,6 +212,15 @@ public class PlaceOrderTest {
             Order result = placeOrder.placeOrder(request, "ana@techcellshop.com", "KEY-001");
 
             assertThat(result.getIdOrder()).isEqualTo(1L);
+
+            assertThat(result.getUserIdSnapshot()).isEqualTo(1L);
+            assertThat(result.getUserNameSnapshot()).isEqualTo("Ana Silva");
+            assertThat(result.getUserEmailSnapshot()).isEqualTo("ana@techcellshop.com");
+
+            assertThat(result.getDeviceIdSnapshot()).isEqualTo(1L);
+            assertThat(result.getDeviceNameSnapshot()).isEqualTo("Galaxy S24");
+            assertThat(result.getUnitPriceSnapshot()).isEqualByComparingTo("3999.90");
+
             assertThat(result.getTotalPriceOrder()).isEqualByComparingTo("3999.90");
             assertThat(result.getDiscountAmount()).isEqualByComparingTo("0.00");
             assertThat(result.getFinalAmount()).isEqualByComparingTo("3999.90");
@@ -210,7 +231,7 @@ public class PlaceOrderTest {
             verify(counter).increment();
         }
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("existing key with same payload should return existing order")
         void shouldReturnExistingOrderWhenKeyAlreadyExists() {
             Order existingOrder = new Order();
@@ -233,7 +254,7 @@ public class PlaceOrderTest {
             verify(orderIdempondencyRepository, never()).save(any(OrderIdempondency.class));
         }
 
-        @org.junit.jupiter.api.Test
+        @Test
         @DisplayName("existing key with different payload should throw")
         void shouldThrowWhenKeyExistsWithDifferentPayload() {
             OrderIdempondency existingRecord = new OrderIdempondency();
@@ -250,7 +271,7 @@ public class PlaceOrderTest {
         }
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     @DisplayName("recoverFromOptimisticLock should increment conflict counter and rethrow")
     void recoverFromOptimisticLockShouldIncrementCounterAndRethrow() {
         ObjectOptimisticLockingFailureException exception =

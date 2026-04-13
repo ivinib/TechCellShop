@@ -28,6 +28,24 @@ public class Order {
     @JoinColumn(name = "id_device")
     private Device device;
 
+    @Column(name = "user_id_snapshot")
+    private Long userIdSnapshot;
+
+    @Column(name = "user_name_snapshot", length = 120)
+    private String userNameSnapshot;
+
+    @Column(name = "user_email_snapshot", length = 150)
+    private String userEmailSnapshot;
+
+    @Column(name = "device_id_snapshot")
+    private Long deviceIdSnapshot;
+
+    @Column(name = "device_name_snapshot", length = 120)
+    private String deviceNameSnapshot;
+
+    @Column(name = "unit_price_snapshot", precision = 12, scale = 2)
+    private BigDecimal unitPriceSnapshot;
+
     @Column(name = "quantity_order")
     private Integer quantityOrder;
 

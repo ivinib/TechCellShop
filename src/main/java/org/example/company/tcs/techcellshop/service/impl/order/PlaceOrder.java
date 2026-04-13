@@ -134,6 +134,15 @@ public class PlaceOrder {
         Order order = new Order();
         order.setUser(user);
         order.setDevice(device);
+
+        order.setUserIdSnapshot(user.getIdUser());
+        order.setUserNameSnapshot(user.getNameUser());
+        order.setUserEmailSnapshot(user.getEmailUser());
+
+        order.setDeviceIdSnapshot(device.getIdDevice());
+        order.setDeviceNameSnapshot(device.getNameDevice());
+        order.setUnitPriceSnapshot(device.getDevicePrice());
+
         order.setQuantityOrder(quantity);
         order.setPaymentMethod(request.getPaymentMethod());
         order.setStatus(OrderStatus.CREATED);

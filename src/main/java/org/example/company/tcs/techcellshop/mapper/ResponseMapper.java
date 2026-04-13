@@ -46,20 +46,8 @@ public class ResponseMapper {
     }
 
     public OrderResponse toOrderResponse(Order order) {
-        User user = order.getUser();
-        Device device = order.getDevice();
-
-        UserSummaryResponse userSummary = user == null ? null : new UserSummaryResponse(
-                user.getIdUser(),
-                user.getNameUser(),
-                maskEmail(user.getEmailUser())
-        );
-
-        DeviceSummaryResponse deviceSummary = device == null ? null : new DeviceSummaryResponse(
-                device.getIdDevice(),
-                device.getNameDevice(),
-                device.getDevicePrice()
-        );
+        UserSummaryResponse userSummary = buildUserSummary(order);
+        DeviceSummaryResponse deviceSummary = buildDeviceSummary(order);
 
         return new OrderResponse(
                 order.getIdOrder(),
@@ -81,6 +69,52 @@ public class ResponseMapper {
 
     public List<OrderResponse> toOrderResponseList(List<Order> orders) {
         return orders.stream().map(this::toOrderResponse).toList();
+    }
+
+    private UserSummaryResponse buildUserSummary(Order order) {
+        if (order.getUserIdSnapshot() != null
+                || order.getUserNameSnapshot() != null
+                || order.getUserEmailSnapshot() != null) {
+            return new UserSummaryResponse(
+                    order.getUserIdSnapshot(),
+                    order.getUserNameSnapshot(),
+                    maskEmail(order.getUserEmailSnapshot())
+            );
+        }
+
+        User user = order.getUser();
+        if (user == null) {
+            return null;
+        }
+
+        return new UserSummaryResponse(
+                user.getIdUser(),
+                user.getNameUser(),
+                maskEmail(user.getEmailUser())
+        );
+    }
+
+    private DeviceSummaryResponse buildDeviceSummary(Order order) {
+        if (order.getDeviceIdSnapshot() != null
+                || order.getDeviceNameSnapshot() != null
+                || order.getUnitPriceSnapshot() != null) {
+            return new DeviceSummaryResponse(
+                    order.getDeviceIdSnapshot(),
+                    order.getDeviceNameSnapshot(),
+                    order.getUnitPriceSnapshot()
+            );
+        }
+
+        Device device = order.getDevice();
+        if (device == null) {
+            return null;
+        }
+
+        return new DeviceSummaryResponse(
+                device.getIdDevice(),
+                device.getNameDevice(),
+                device.getDevicePrice()
+        );
     }
 
     private String maskEmail(String email) {

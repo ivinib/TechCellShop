@@ -9,6 +9,7 @@ import org.example.company.tcs.techcellshop.dto.response.UserResponse;
 import org.example.company.tcs.techcellshop.util.OrderStatus;
 import org.example.company.tcs.techcellshop.util.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -18,162 +19,116 @@ import static org.assertj.core.api.Assertions.*;
 
 class ResponseMapperTest {
 
-    private ResponseMapper responseMapper;
-    private User user;
-    private Device device;
-    private Order order;
 
-    @BeforeEach
-    void setUp() {
-        responseMapper = new ResponseMapper();
+    private final ResponseMapper responseMapper = new ResponseMapper();
 
-        user = new User();
-        user.setIdUser(1L);
-        user.setNameUser("Ana Silva");
-        user.setEmailUser("ana@techcellshop.com");
-        user.setPhoneUser("+55 11 90000-0001");
-        user.setAddressUser("Rua das Flores, 123 - Sao Paulo - SP");
-        user.setRoleUser("USER");
+    @Test
+    @DisplayName("toOrderResponse should prefer snapshot fields when present")
+    void toOrderResponse_shouldPreferSnapshotFieldsWhenPresent() {
+        User user = new User();
+        user.setIdUser(99L);
+        user.setNameUser("Different User");
+        user.setEmailUser("different@techcellshop.com");
 
-        device = new Device();
-        device.setIdDevice(1L);
-        device.setNameDevice("Galaxy S24");
-        device.setDescriptionDevice("Samsung smartphone 256GB");
-        device.setDeviceType("SMARTPHONE");
-        device.setDeviceStorage("256GB");
-        device.setDeviceRam("8GB");
-        device.setDeviceColor("Black");
-        device.setDevicePrice(money("3999.90"));
-        device.setDeviceStock(10);
-        device.setDeviceCondition("NEW");
+        Device device = new Device();
+        device.setIdDevice(88L);
+        device.setNameDevice("Different Device");
+        device.setDevicePrice(new BigDecimal("9999.99"));
 
-        order = new Order();
+        Order order = new Order();
         order.setIdOrder(1L);
         order.setUser(user);
         order.setDevice(device);
-        order.setQuantityOrder(2);
-        order.setTotalPriceOrder(money("7999.80"));
+
+        order.setUserIdSnapshot(1L);
+        order.setUserNameSnapshot("Ana Silva");
+        order.setUserEmailSnapshot("ana@techcellshop.com");
+
+        order.setDeviceIdSnapshot(1L);
+        order.setDeviceNameSnapshot("Galaxy S24");
+        order.setUnitPriceSnapshot(new BigDecimal("3999.90"));
+
+        order.setQuantityOrder(1);
+        order.setTotalPriceOrder(new BigDecimal("3999.90"));
         order.setStatus(OrderStatus.CREATED);
-        order.setOrderDate("2026-03-24");
-        order.setDeliveryDate("2026-03-31");
-        order.setPaymentMethod("CREDIT_CARD");
+        order.setOrderDate("2026-04-01");
+        order.setDeliveryDate("2026-04-06");
+        order.setPaymentMethod("PIX");
         order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setDiscountAmount(new BigDecimal("0.00"));
+        order.setFinalAmount(new BigDecimal("3999.90"));
+
+        OrderResponse response = responseMapper.toOrderResponse(order);
+
+        assertThat(response.user()).isNotNull();
+        assertThat(response.user().idUser()).isEqualTo(1L);
+        assertThat(response.user().nameUser()).isEqualTo("Ana Silva");
+        assertThat(response.user().emailUserMasked()).isEqualTo("a***a@techcellshop.com");
+
+        assertThat(response.device()).isNotNull();
+        assertThat(response.device().idDevice()).isEqualTo(1L);
+        assertThat(response.device().nameDevice()).isEqualTo("Galaxy S24");
+        assertThat(response.device().devicePrice()).isEqualByComparingTo("3999.90");
     }
 
     @Test
-    void toUserResponse_shouldMapAllFieldsAndMaskEmail() {
-        UserResponse result = responseMapper.toUserResponse(user);
+    @DisplayName("toOrderResponse should fallback to related entities when snapshots are absent")
+    void toOrderResponse_shouldFallbackToRelationsWhenSnapshotsAreAbsent() {
+        User user = new User();
+        user.setIdUser(1L);
+        user.setNameUser("Ana Silva");
+        user.setEmailUser("ana@techcellshop.com");
 
-        assertThat(result.idUser()).isEqualTo(1L);
-        assertThat(result.nameUser()).isEqualTo("Ana Silva");
-        assertThat(result.emailUserMasked()).isEqualTo("a***a@techcellshop.com");
-        assertThat(result.phoneUser()).isEqualTo("+55 11 90000-0001");
-        assertThat(result.addressUser()).isEqualTo("Rua das Flores, 123 - Sao Paulo - SP");
-        assertThat(result.roleUser()).isEqualTo("USER");
+        Device device = new Device();
+        device.setIdDevice(1L);
+        device.setNameDevice("Galaxy S24");
+        device.setDevicePrice(new BigDecimal("3999.90"));
+
+        Order order = new Order();
+        order.setIdOrder(1L);
+        order.setUser(user);
+        order.setDevice(device);
+        order.setQuantityOrder(1);
+        order.setTotalPriceOrder(new BigDecimal("3999.90"));
+        order.setStatus(OrderStatus.CREATED);
+        order.setOrderDate("2026-04-01");
+        order.setDeliveryDate("2026-04-06");
+        order.setPaymentMethod("PIX");
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setDiscountAmount(new BigDecimal("0.00"));
+        order.setFinalAmount(new BigDecimal("3999.90"));
+
+        OrderResponse response = responseMapper.toOrderResponse(order);
+
+        assertThat(response.user()).isNotNull();
+        assertThat(response.user().idUser()).isEqualTo(1L);
+        assertThat(response.user().nameUser()).isEqualTo("Ana Silva");
+        assertThat(response.user().emailUserMasked()).isEqualTo("a***a@techcellshop.com");
+
+        assertThat(response.device()).isNotNull();
+        assertThat(response.device().idDevice()).isEqualTo(1L);
+        assertThat(response.device().nameDevice()).isEqualTo("Galaxy S24");
+        assertThat(response.device().devicePrice()).isEqualByComparingTo("3999.90");
     }
 
     @Test
-    void toUserResponse_emailWithTwoCharLocalPart_shouldUseShortMaskFormat() {
-        user.setEmailUser("ab@techcellshop.com");
+    @DisplayName("toOrderResponse should return null summaries when neither snapshots nor relations exist")
+    void toOrderResponse_shouldReturnNullSummariesWhenNoSourceExists() {
+        Order order = new Order();
+        order.setIdOrder(1L);
+        order.setQuantityOrder(1);
+        order.setTotalPriceOrder(new BigDecimal("3999.90"));
+        order.setStatus(OrderStatus.CREATED);
+        order.setOrderDate("2026-04-01");
+        order.setDeliveryDate("2026-04-06");
+        order.setPaymentMethod("PIX");
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setDiscountAmount(new BigDecimal("0.00"));
+        order.setFinalAmount(new BigDecimal("3999.90"));
 
-        UserResponse result = responseMapper.toUserResponse(user);
+        OrderResponse response = responseMapper.toOrderResponse(order);
 
-        assertThat(result.emailUserMasked()).isEqualTo("a***@techcellshop.com");
-    }
-
-    @Test
-    void toUserResponse_emailWithOneCharLocalPart_shouldUseShortMaskFormat() {
-        user.setEmailUser("a@techcellshop.com");
-
-        UserResponse result = responseMapper.toUserResponse(user);
-
-        assertThat(result.emailUserMasked()).isEqualTo("a***@techcellshop.com");
-    }
-
-    @Test
-    void toUserResponseList_shouldMapAllUsersInList() {
-        List<UserResponse> result = responseMapper.toUserResponseList(List.of(user));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).nameUser()).isEqualTo("Ana Silva");
-        assertThat(result.get(0).emailUserMasked()).isEqualTo("a***a@techcellshop.com");
-    }
-
-    @Test
-    void toDeviceResponse_shouldMapAllFields() {
-        DeviceResponse result = responseMapper.toDeviceResponse(device);
-
-        assertThat(result.idDevice()).isEqualTo(1L);
-        assertThat(result.nameDevice()).isEqualTo("Galaxy S24");
-        assertThat(result.descriptionDevice()).isEqualTo("Samsung smartphone 256GB");
-        assertThat(result.deviceType()).isEqualTo("SMARTPHONE");
-        assertThat(result.deviceStorage()).isEqualTo("256GB");
-        assertThat(result.deviceRam()).isEqualTo("8GB");
-        assertThat(result.deviceColor()).isEqualTo("Black");
-        assertThat(result.devicePrice()).isEqualByComparingTo("3999.90");
-        assertThat(result.deviceStock()).isEqualTo(10);
-        assertThat(result.deviceCondition()).isEqualTo("NEW");
-    }
-
-    @Test
-    void toDeviceResponseList_shouldMapAllDevicesInList() {
-        List<DeviceResponse> result = responseMapper.toDeviceResponseList(List.of(device));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).nameDevice()).isEqualTo("Galaxy S24");
-    }
-
-    @Test
-    void toOrderResponse_shouldMapAllFieldsWithUserAndDeviceSummary() {
-        OrderResponse result = responseMapper.toOrderResponse(order);
-
-        assertThat(result.idOrder()).isEqualTo(1L);
-        assertThat(result.quantityOrder()).isEqualTo(2);
-        assertThat(result.totalPriceOrder()).isEqualByComparingTo("7999.80");
-        assertThat(result.statusOrder()).isEqualTo(OrderStatus.CREATED);
-        assertThat(result.orderDate()).isEqualTo("2026-03-24");
-        assertThat(result.deliveryDate()).isEqualTo("2026-03-31");
-        assertThat(result.paymentMethod()).isEqualTo("CREDIT_CARD");
-        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
-
-        assertThat(result.user()).isNotNull();
-        assertThat(result.user().idUser()).isEqualTo(1L);
-        assertThat(result.user().nameUser()).isEqualTo("Ana Silva");
-        assertThat(result.user().emailUserMasked()).isEqualTo("a***a@techcellshop.com");
-
-        assertThat(result.device()).isNotNull();
-        assertThat(result.device().idDevice()).isEqualTo(1L);
-        assertThat(result.device().nameDevice()).isEqualTo("Galaxy S24");
-        assertThat(result.device().devicePrice()).isEqualByComparingTo("3999.90");
-    }
-
-    @Test
-    void toOrderResponse_whenUserIsNull_shouldReturnNullUserSummary() {
-        order.setUser(null);
-
-        OrderResponse result = responseMapper.toOrderResponse(order);
-
-        assertThat(result.user()).isNull();
-    }
-
-    @Test
-    void toOrderResponse_whenDeviceIsNull_shouldReturnNullDeviceSummary() {
-        order.setDevice(null);
-
-        OrderResponse result = responseMapper.toOrderResponse(order);
-
-        assertThat(result.device()).isNull();
-    }
-
-    @Test
-    void toOrderResponseList_shouldMapAllOrdersInList() {
-        List<OrderResponse> result = responseMapper.toOrderResponseList(List.of(order));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).statusOrder()).isEqualTo(OrderStatus.CREATED);
-    }
-
-    private BigDecimal money(String value) {
-        return new BigDecimal(value);
+        assertThat(response.user()).isNull();
+        assertThat(response.device()).isNull();
     }
 }

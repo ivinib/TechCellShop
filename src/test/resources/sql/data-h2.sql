@@ -14,13 +14,87 @@ MERGE INTO tb_device (id_device, name_device, description_device, device_type, d
     KEY (id_device)
     VALUES (2, 'ThinkPad X1 Carbon', 'Lenovo laptop 1TB SSD', 'LAPTOP', '1TB', '16GB', 'Gray', 8999.00, 5, 'REFURBISHED');
 
-MERGE INTO tb_order (id_order, id_user, id_device, quantity_order, total_price_order, status_order, order_date, delivery_date, payment_method, payment_status_order)
-    KEY (id_order)
-    VALUES (1, 1, 1, 1, 3999.90, 'CREATED', '2026-03-23', '2026-03-27', 'PIX', 'CONFIRMED');
+MERGE INTO tb_order (
+    id_order,
+    id_user,
+    id_device,
+    user_id_snapshot,
+    user_name_snapshot,
+    user_email_snapshot,
+    device_id_snapshot,
+    device_name_snapshot,
+    unit_price_snapshot,
+    quantity_order,
+    total_price_order,
+    status_order,
+    order_date,
+    delivery_date,
+    payment_method,
+    payment_status_order,
+    discount_amount_order,
+    final_amount_order
+    ) KEY (id_order)
+    VALUES (
+    1,
+    1,
+    1,
+    1,
+    'Ana Silva',
+    'ana@techcellshop.com',
+    1,
+    'Galaxy S24',
+    3999.90,
+    1,
+    3999.90,
+    'CREATED',
+    '2026-03-23',
+    '2026-03-27',
+    'PIX',
+    'CONFIRMED',
+    0.00,
+    3999.90
+    );
 
-MERGE INTO tb_order (id_order, id_user, id_device, quantity_order, total_price_order, status_order, order_date, delivery_date, payment_method, payment_status_order)
-    KEY (id_order)
-    VALUES (2, 2, 2, 1, 8999.00, 'PAID', '2026-03-23', '2026-03-29', 'CREDIT_CARD', 'AUTHORIZED');
+MERGE INTO tb_order (
+    id_order,
+    id_user,
+    id_device,
+    user_id_snapshot,
+    user_name_snapshot,
+    user_email_snapshot,
+    device_id_snapshot,
+    device_name_snapshot,
+    unit_price_snapshot,
+    quantity_order,
+    total_price_order,
+    status_order,
+    order_date,
+    delivery_date,
+    payment_method,
+    payment_status_order,
+    discount_amount_order,
+    final_amount_order
+    ) KEY (id_order)
+    VALUES (
+    2,
+    2,
+    2,
+    2,
+    'Carlos Souza',
+    'carlos@techcellshop.com',
+    2,
+    'ThinkPad X1 Carbon',
+    8999.00,
+    1,
+    8999.00,
+    'PAID',
+    '2026-03-23',
+    '2026-03-29',
+    'CREDIT_CARD',
+    'AUTHORIZED',
+    0.00,
+    8999.00
+    );
 
 ALTER TABLE tb_user ALTER COLUMN id_user RESTART WITH 10;
 ALTER TABLE tb_device ALTER COLUMN id_device RESTART WITH 10;
