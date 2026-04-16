@@ -1,0 +1,12 @@
+aws_region = "us-east-1"
+
+postgres_password     = "YourPostgresPassword"
+rabbitmq_password     = "YourRabbitMQPassword"
+jwt_secret            = "9ZWHZKiD/Z79+Rp3/f0+wuueCo5e+vcOGTxNoAo1kriC2cA/N2jUyBcaDhWJb4Ky"
+
+docker_image_uri      = "your-account.dkr.ecr.us-east-1.amazonaws.com/techcellshop:latest"
+
+ecs_desired_count     = 2
+ecs_max_count         = 4
+
+deploy_rabbitmq_on_ec2 = true
