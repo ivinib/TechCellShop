@@ -1,6 +1,6 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import org.example.company.tcs.testsupport.security.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.OutboxEventResponseDto;
 import org.example.company.tcs.techcellshop.dto.RequeueResultDto;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;

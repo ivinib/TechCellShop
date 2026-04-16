@@ -14,7 +14,17 @@ RUN ./mvnw -q -DskipTests clean package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-COPY --from=build /app/target/*.jar app.jar
+LABEL org.opencontainers.image.title="TechCellShop"
+LABEL org.opencontainers.image.description="Modular monolith Spring Boot backend for a tech retail domain"
+LABEL org.opencontainers.image.source="https://github.com/ivinib/TechCellShop"
+
+RUN groupadd --system spring && useradd --system --gid spring --create-home spring
+
+COPY --from=build /app/target/*.jar /app/app.jar
+RUN chown -R spring:spring /app
+
+USER spring
+
 EXPOSE 8080
 
 ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75","-jar","/app/app.jar"]

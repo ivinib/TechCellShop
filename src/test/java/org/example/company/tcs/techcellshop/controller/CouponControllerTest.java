@@ -1,6 +1,7 @@
 package org.example.company.tcs.techcellshop.controller;
 
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import org.example.company.tcs.techcellshop.config.JacksonConfig;
+import org.example.company.tcs.testsupport.security.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationRequestDto;
 import org.example.company.tcs.techcellshop.dto.coupon.CouponValidationResponseDto;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
@@ -33,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        SecurityWebMvcTestConfig.class
+        SecurityWebMvcTestConfig.class,
+        JacksonConfig.class,
 })
 class CouponControllerTest {
 

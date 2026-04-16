@@ -104,10 +104,52 @@ services:
     networks:
       - techcellshop_net
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: techcellshop-prometheus
+    restart: unless-stopped
+    profiles: [ "observability" ]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - techcellshop_net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: techcellshop-grafana
+    restart: unless-stopped
+    profiles: [ "observability" ]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./ops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./ops/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - techcellshop_net
+
 volumes:
   pg_data:
   rabbitmq_data:
   pgadmin_data:
+  prometheus_data:
+  grafana_data:
+
 
 networks:
   techcellshop_net:

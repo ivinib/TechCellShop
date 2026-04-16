@@ -2,7 +2,7 @@
 
 [![Java](https://img.shields.io/badge/Java-21-blue)]()
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-brightgreen)]()
-[![Build](https://img.shields.io/badge/Build-Maven-orange)]()
+[![CI](https://github.com/ivinib/TechCellShop/actions/workflows/ci.yml/badge.svg)](https://github.com/ivinib/TechCellShop/actions/workflows/ci.yml)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL-336791)]()
 [![Messaging](https://img.shields.io/badge/Messaging-RabbitMQ-ff6600)]()
 [![Docs](https://img.shields.io/badge/API-Swagger-success)]()
@@ -24,7 +24,7 @@ It is designed to showcase backend engineering concerns beyond basic CRUD, inclu
 
 ## Table of Contents
 
-- [Summary of the purpose of this project](#Summary of the purpose of this project)
+- [Summary of the purpose of this project](#summary-of-the-purpose-of-this-project)
 - [Key features](#key-features)
 - [Architecture](#architecture)
 - [System architecture diagram](#system-architecture-diagram)
@@ -37,7 +37,9 @@ It is designed to showcase backend engineering concerns beyond basic CRUD, inclu
 - [Observability](#observability)
 - [Outbox event recovery](#outbox-event-recovery)
 - [Running locally](#running-locally)
+- [Environment configuration](#environment-configuration)
 - [Local URLs](#local-urls)
+- [Deployment notes](#deployment-notes)
 - [Testing](#testing)
 - [Where to look in the code first](#where-to-look-in-the-code-first)
 - [Future improvements](#future-improvements)
@@ -223,3 +225,43 @@ flowchart LR
 
     Health --> DB
     Health --> Rabbit
+
+```
+## Environment configuration
+
+Create a local environment file before starting the Docker stack:
+
+```zsh
+cp .env.example .env
+```
+
+## Observability stack
+
+The application already exposes Prometheus-formatted metrics at:
+
+- `http://localhost:8080/actuator/prometheus`
+
+This repository also includes an optional local observability stack with:
+- Prometheus
+- Grafana
+
+### Start the observability profile
+
+```zsh
+cp .env.example .env
+docker compose --profile observability up -d
+```
+
+## Hosted deployment
+
+This project also includes a production-oriented runtime profile for hosted environments.
+
+Recommended first hosted target:
+- Railway-friendly deployment using:
+  - one application service
+  - one PostgreSQL service
+  - one RabbitMQ service
+
+See the deployment guide:
+
+- [`docs/deployment/railway.md`](file:///Users/vinibasso/IdeaProjects/TechCellShop/docs/deployment/railway.md)

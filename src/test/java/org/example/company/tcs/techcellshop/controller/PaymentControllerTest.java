@@ -2,7 +2,8 @@ package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.JwtException;
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import org.example.company.tcs.techcellshop.config.JacksonConfig;
+import org.example.company.tcs.testsupport.security.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentActionRequestDto;
 import org.example.company.tcs.techcellshop.dto.payment.PaymentResponseDto;
 import org.example.company.tcs.techcellshop.exception.GlobalExceptionHandler;
@@ -38,7 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        SecurityWebMvcTestConfig.class
+        SecurityWebMvcTestConfig.class,
+        JacksonConfig.class
 })
 @DisplayName("PaymentController")
 class PaymentControllerTest {

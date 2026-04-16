@@ -1,6 +1,8 @@
 target
 .git
+.github
 .idea
 *.iml
-README.md
+.env
 HELP.md
+README.md

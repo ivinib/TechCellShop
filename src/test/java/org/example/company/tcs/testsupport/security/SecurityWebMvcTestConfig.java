@@ -1,4 +1,4 @@
-package org.example.company.tcs.techcellshop.config;
+package org.example.company.tcs.testsupport.security;
 
 import org.example.company.tcs.techcellshop.security.JwtAuthenticationFilter;
 import org.example.company.tcs.techcellshop.security.RestAccessDeniedHandler;
@@ -8,12 +8,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@TestConfiguration
+@TestConfiguration(proxyBeanMethods = false)
+@EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityWebMvcTestConfig {
 

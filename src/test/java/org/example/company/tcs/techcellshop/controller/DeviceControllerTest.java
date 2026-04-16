@@ -1,7 +1,8 @@
 package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import org.example.company.tcs.techcellshop.config.JacksonConfig;
+import org.example.company.tcs.testsupport.security.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.domain.Device;
 import org.example.company.tcs.techcellshop.dto.request.DeviceEnrollmentRequest;
 import org.example.company.tcs.techcellshop.dto.request.DeviceUpdateRequest;
@@ -51,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DeviceController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityWebMvcTestConfig.class})
+@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityWebMvcTestConfig.class, JacksonConfig.class})
 @DisplayName("DeviceController")
 class DeviceControllerTest {
 

@@ -1,7 +1,8 @@
 package org.example.company.tcs.techcellshop.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.company.tcs.techcellshop.config.SecurityWebMvcTestConfig;
+import org.example.company.tcs.techcellshop.config.JacksonConfig;
+import org.example.company.tcs.testsupport.security.SecurityWebMvcTestConfig;
 import org.example.company.tcs.techcellshop.domain.Order;
 import org.example.company.tcs.techcellshop.dto.order.OrderStatusUpdateRequestDto;
 import org.example.company.tcs.techcellshop.dto.request.OrderEnrollmentRequest;
@@ -61,7 +62,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         GlobalExceptionHandler.class,
         TraceIdFilter.class,
-        SecurityWebMvcTestConfig.class
+        SecurityWebMvcTestConfig.class,
+        JacksonConfig.class
 })
 class OrderControllerTest {
 
